@@ -1,0 +1,4 @@
+# Loaded on top of application.yml by tests annotated with @ActiveProfiles("test")
+jobtrackr:
+  jwt:
+    secret: test-only-signing-key-not-used-anywhere-else-0123456789

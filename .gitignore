@@ -1,0 +1,27 @@
+# The only .gitignore in the repository. Patterns without a leading slash match at any depth,
+# so "target/" covers jobtrackr-backend/target/ and "node_modules/" will cover the Angular app too.
+
+# Maven build output
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# npm packages (root commit tooling now, the Angular app later)
+node_modules/
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Secrets and local environment files (JWT_SECRET etc. must never be committed)
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store

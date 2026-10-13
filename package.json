@@ -1,0 +1,15 @@
+{
+  "name": "jobtrackr",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repository tooling for the JobTrackr monorepo (commit message linting). Application code lives in jobtrackr-backend.",
+  "scripts": {
+    "prepare": "husky",
+    "commitlint": "commitlint --edit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "husky": "^9.1.7"
+  }
+}

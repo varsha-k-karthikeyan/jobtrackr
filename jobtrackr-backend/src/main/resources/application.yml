@@ -1,0 +1,38 @@
+# Main configuration. Loaded for every run; src/test/resources/application-test.yml is layered on top in tests.
+# The only value that must come from outside is JWT_SECRET (see the bottom of this file).
+spring:
+  application:
+    name: jobtrackr-backend
+
+  # Must match the POSTGRES_* values and the port mapping in docker-compose.yml at the monorepo root.
+  # These are local-development credentials; a deployed environment overrides them with
+  # SPRING_DATASOURCE_URL / SPRING_DATASOURCE_USERNAME / SPRING_DATASOURCE_PASSWORD.
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jobtrackr
+    username: jobtrackr
+    password: jobtrackr
+
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Hibernate only checks entities against the schema; Flyway owns all DDL
+    open-in-view: false    # no lazy loading during view rendering; fetch what you need inside the service
+
+  flyway:
+    enabled: true          # runs db/migration/V*.sql on startup, before Hibernate validates
+
+  data:
+    web:
+      pageable:
+        max-page-size: 100 # cap ?size= so a client cannot ask for the whole table in one page
+
+  docker:
+    compose:
+      enabled: false       # Docker is started manually with `docker compose up -d` from the monorepo root
+
+# Application-specific settings, bound to auth/JwtProperties.java (validated at startup)
+jobtrackr:
+  jwt:
+    # HS256 signing key from the environment (min 32 characters); never committed.
+    # No default on purpose: the app refuses to start without it. Changing it invalidates every issued token.
+    secret: ${JWT_SECRET}
+    access-token-ttl: 15m  # how long an access token is valid; there are no refresh tokens yet

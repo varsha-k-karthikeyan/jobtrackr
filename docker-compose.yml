@@ -1,0 +1,14 @@
+services:                                   # list of containers Compose will run
+  postgres:                                 # service name (also its hostname on the Docker network)
+    image: 'postgres:16'                    # official Postgres image, pinned to major version 16
+    environment:                            # settings read by the image on first startup
+      - 'POSTGRES_DB=jobtrackr'             # database created automatically on first run
+      - 'POSTGRES_PASSWORD=jobtrackr'       # password for the DB user (fine for local dev only)
+      - 'POSTGRES_USER=jobtrackr'           # DB user created on first run
+    ports:                                  # expose container ports to your machine
+      - '5432:5432'                         # host port : container port (Spring Boot connects to localhost:5432)
+    volumes:                                # persistent storage for this container
+      - pgdata:/var/lib/postgresql/data     # mount named volume 'pgdata' at Postgres's data folder
+
+volumes:                                    # top-level declaration of named volumes
+  pgdata:                                   # create/manage a volume called 'pgdata' with default settings

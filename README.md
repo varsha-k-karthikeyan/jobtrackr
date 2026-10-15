@@ -56,7 +56,18 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 
 A real `JWT_SECRET` environment variable, if set, takes priority over the file; that is how a deployed server would provide it. Keep the value stable: changing it logs out everyone who holds a token.
 
-Optional: `CORS_ALLOWED_ORIGINS` lists the browser origins allowed to call the API (comma-separated). It defaults to `http://localhost:4200`, the Angular dev server.
+Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example) at the repository root. Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
+
+#### Environment variables in an IntelliJ run configuration (Windows)
+
+Use this instead of the file, or to override it:
+
+1. **Run > Edit Configurations...** and select `JobtrackrBackendApplication`. If it is missing, click **+**, choose **Spring Boot** (or **Application** in the Community edition), set the main class to `com.jobtrackr.jobtrackrbackend.JobtrackrBackendApplication` and the module to `jobtrackr-backend`.
+2. Set **Working directory** to `E:\JobTrackr project\jobtrackr-backend`. The `.env.properties` file is looked up relative to it, so with the monorepo root as the working directory the file is silently skipped and startup fails on the missing `JWT_SECRET`.
+3. In **Environment variables** (if the field is hidden: **Modify options > Environment variables**), click the icon at the right end of the field, then **+**, and add `JWT_SECRET` with your value. Typed directly, the format is `JWT_SECRET=...;CORS_ALLOWED_ORIGINS=http://localhost:4200`, with entries separated by semicolons.
+   Alternatively, copy `.env.example` to `.env`, fill it in, and select that file with the field's folder icon (recent IntelliJ versions load `.env` files there).
+4. Leave **Store as project file** unchecked. Run configurations then live in `.idea/`, which is git-ignored; a stored one would be written to `.run/` and could be committed together with your secret.
+5. **Apply**, then run. A missing secret fails at startup with `jobtrackr.jwt.secret` in the error.
 
 Then open Swagger UI at http://localhost:8080/swagger-ui.html:
 
@@ -104,6 +115,8 @@ Base path `/api/v1`. Everything except `/auth/**` needs `Authorization: Bearer <
 | `POST /applications/{id}/notes` | Add a note |
 | `DELETE /notes/{id}` | Delete a note |
 | `GET /stats` | Counts per status, total and response rate |
+| `GET /notifications` | Follow-ups for the bell: `due` (today or overdue) and `upcoming` (next 7 days), Applied and Interview cards only |
+| `DELETE /notifications/{applicationId}` | Dismiss one due follow-up (until its date changes); `DELETE /notifications` dismisses all |
 
 Swagger UI is the full, always-current reference.
 
@@ -128,9 +141,9 @@ Then start the backend; Flyway rebuilds the database from the migrations.
 ## Status
 
 Built:
-- Backend: Kanban API (CRUD, move, notes), stats, validation and error handling, JWT authentication, CORS, a public demo account, tests.
-- Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, tests.
+- Backend: Kanban API (CRUD, move, notes), stats, follow-up notifications, validation and error handling, JWT authentication, CORS, a public demo account, tests.
+- Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, follow-up bell in the header, tests.
 
 Sessions: a 15-minute access token plus a 14-day refresh token in an httpOnly cookie, rotated on every use, so you stay signed in while you keep using the app (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 8).
 
-Not built yet: resume upload and AI match, follow-up reminder emails, deployment.
+Not built yet: resume upload and AI match, deployment. Follow-up reminders are in-app only (the bell); there is no email.

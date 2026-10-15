@@ -24,9 +24,11 @@ npm-debug.log
 *.ipr
 .vscode/
 
-# Secrets and local environment files (JWT_SECRET etc. must never be committed)
+# Secrets and local environment files (JWT_SECRET etc. must never be committed).
+# ".env.*" also covers jobtrackr-backend/.env.properties. The example holds placeholders only, so it is kept.
 .env
 .env.*
+!.env.example
 
 # Logs
 *.log

@@ -19,7 +19,7 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 
 | Message in the log | Cause | Fix |
 |---|---|---|
-| `Binding to target ...JwtProperties failed`, `Value: "${JWT_SECRET}"`, `must be at least 32 characters` (or `Could not resolve placeholder 'JWT_SECRET'`) | `JWT_SECRET` is **not set** for this run: Spring left the placeholder as literal text, which then fails the length check | Create `jobtrackr-backend/.env.properties` with a `JWT_SECRET=...` line (command in the README). If it exists, check the run's working directory is `jobtrackr-backend`: the file is found relative to it |
+| `Binding to target ...JwtProperties failed`, `Value: "${JWT_SECRET}"`, `must be at least 32 characters` (or `Could not resolve placeholder 'JWT_SECRET'`) | `JWT_SECRET` is **not set** for this run: Spring left the placeholder as literal text, which then fails the length check | Create `jobtrackr-backend/.env.properties` with a `JWT_SECRET=...` line (copy `.env.example` from the repository root, or use the command in the README). If it exists, check the run's working directory is `jobtrackr-backend`: the file is found relative to it |
 | `jobtrackr.jwt.secret ... must be at least 32 characters` with your real value shown | The secret is too short for HS256 | Use a value of at least 32 characters |
 | `Connection to localhost:5432 refused` | The database container is not running | `docker compose up -d` from the monorepo root |
 | `password authentication failed for user "jobtrackr"` | A locally installed PostgreSQL service owns port 5432, so the app is talking to the wrong server | In an administrator PowerShell: `Stop-Service postgresql-x64-18` (use your version), then `docker compose down` and `docker compose up -d` |
@@ -197,6 +197,7 @@ $part += '=' * ((4 - $part.Length % 4) % 4)
 | A dragged card snaps back with "Couldn't move ..." | `PATCH /move` failed with a non-409 error | Network tab; on 404/409 the board reloads instead |
 | Edit dialog shows "This card was changed elsewhere" | 409: another tab saved the card first | Expected. The form now holds the latest version; edit and save again |
 | Styling on a Material component has no effect | Tailwind utilities are layered and lose to Material | Put the utility on a wrapper element, or use a `mat.*-overrides` mixin |
+| The bell does not list a card whose follow-up is due | Only APPLIED and INTERVIEW cards are listed; or it was dismissed (`reminder_dismissed_on >= follow_up_on`); or "today" differs because the server decides it in `notifications.zone` | Check the row in psql. Changing the follow-up date brings it back; `update applications set reminder_dismissed_on = null where id = ...` resets it |
 | `ng build` warns about the bundle budget | Something heavy was imported eagerly | Load it lazily (see `core/notifications/notifier.ts` and the dialog's own providers) |
 
 Useful tools: the Angular DevTools browser extension (component tree and signal values), and DevTools > Network > right-click a request > **Block request URL** to rehearse failure paths.

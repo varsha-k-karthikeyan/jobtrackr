@@ -20,6 +20,7 @@ jobtrackr-backend/
     │   │   ├── user/                         the account entity and GET /me
     │   │   ├── auth/                         register, login, JWT, security configuration
     │   │   ├── stats/                        counts per status and response rate (GET /stats)
+    │   │   ├── notification/                 follow-up reminders for the bell in the header (GET /notifications)
     │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI, CORS
     │   └── resources/
     │       ├── application.yml               all configuration
@@ -52,6 +53,7 @@ Dependencies between features:
 - `application` uses `note` (the detail view includes notes) and `user` (the owner reference).
 - `auth` uses `user`.
 - `stats` reads the `Application` entity through its own `StatsRepository`.
+- `notification` reads and updates `Application` through `ApplicationRepository` (it has no table of its own).
 - Everything may use `common`. `common` uses no feature.
 
 ## 3. Life of a request
@@ -84,7 +86,7 @@ sequenceDiagram
     Ctl-->>C: 200 + JSON
 ```
 
-Any exception thrown in the controller or below is converted to JSON by `common/exception/GlobalExceptionHandler` (see section 12).
+Any exception thrown in the controller or below is converted to JSON by `common/exception/GlobalExceptionHandler` (see section 13).
 
 ## 4. Data model
 
@@ -103,7 +105,7 @@ erDiagram
 | Table | Java entity | Notes |
 |---|---|---|
 | `users` | `user/User` | `email` unique, stored lower-case. `password_hash` is BCrypt |
-| `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter |
+| `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter. `reminder_dismissed_on` (V6, renamed in V7) is internal to the notification feature and in no DTO |
 | `notes` | `note/Note` | No `user_id`; the owner is the owner of the parent application |
 | `resumes` | none yet | Reserved for the AI match feature |
 | `match_results` | none yet | Reserved for the AI match feature |
@@ -213,19 +215,36 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 - `responseRate = (interview + offer + rejected) / total`, between 0 and 1, and 0 when `total` is 0. A rejection counts as a response; only cards still in APPLIED are "no answer yet".
 - The query builds `StatusCount` records directly with a JPQL constructor expression, so no entities are loaded.
 
-## 10. CORS
+## 10. Follow-up notifications
+
+The bell in the app header lists follow-ups. There is no email and no scheduled job: `GET /api/v1/notifications` computes the list from the follow-up dates on every request, so it can never be out of step with the board.
+
+| Endpoint | Does | Returns |
+|---|---|---|
+| `GET /notifications` | `today`, `due` (follow-up today or earlier, most overdue first) and `upcoming` (the next `notifications.upcoming-days` days). Each item has `applicationId`, `company`, `role`, `status`, `followUpOn` and `daysUntilDue` (0 today, negative overdue) | 200 |
+| `DELETE /notifications/{applicationId}` | Dismisses one due follow-up | 204; 404 for another user's card |
+| `DELETE /notifications` | Dismisses every due follow-up of the caller | 204 |
+
+- **Which cards:** status APPLIED or INTERVIEW (`NotificationService.NOTIFIED_STATUSES`) with a `follow_up_on`. Offer and Rejected are finished, so they are never listed.
+- **"Today" is decided in `notifications.zone` (Asia/Kolkata), not in the JVM's UTC.** A follow-up date is a calendar date: at 01:00 in India it is still yesterday in UTC, and a UTC "today" would show a follow-up a day late. The `Clock` bean keeps this testable.
+- **Dismissing** sets `reminder_dismissed_on` to today. A follow-up is listed while `reminder_dismissed_on IS NULL OR reminder_dismissed_on < follow_up_on`. `ApplicationService.update` clears the column when the follow-up date changes, so a rescheduled follow-up notifies again. Upcoming items cannot be dismissed (they are not due yet).
+- **Dismiss is a bulk JPQL update** (`ApplicationRepository.dismissFollowUps`), like `shiftPositions`: it does not bump `@Version`, so an edit form opened before the dismiss still saves without a 409. The same query handles one card or all of them (`:applicationId is null`). It is idempotent, as a DELETE should be.
+- **Why `DELETE` on `/notifications/{applicationId}`:** the resource is "this follow-up in my notifications"; removing it is a delete of the notification, never of the application.
+- **History:** V6 added the column as `reminder_sent_on` for an email version of this feature that was dropped before release; V7 renames it, because an applied migration is never edited.
+
+## 11. CORS
 
 The Angular app runs on a different origin (another port locally, another domain when deployed), so the browser asks permission with a preflight `OPTIONS` request before cross-origin calls.
 
 - `common/config/CorsConfig` defines the rules: allowed origins from `CORS_ALLOWED_ORIGINS`, methods GET, POST, PUT, PATCH, DELETE and OPTIONS, request headers `Authorization` and `Content-Type`, and the `Location` response header exposed to JavaScript.
 - `SecurityConfig` enables it with `.cors(...)`. A preflight carries no token, so without CORS in the security chain it would be rejected with 401 before Spring MVC's own CORS handling ran.
-- No cookies are used, so credentialed CORS is off.
+- Credentialed CORS is on (`allowCredentials(true)`): the refresh-token cookie must travel with `/auth/*` calls from the frontend origin. That is also why origins are listed explicitly; credentials never work with `*`.
 
-## 11. Demo account
+## 12. Demo account
 
 `V4__demo_user_data.sql` gives the V2 demo user (id 1) a real BCrypt hash of the public password `Demo@1234`, deletes any earlier rows of that user, and inserts 16 sample applications (6 / 4 / 2 / 4 across the columns) plus notes. Dates are relative to `CURRENT_DATE` when the migration runs, so a fresh database always has overdue and due-today follow-ups. The data lives only in each developer's local database; Flyway runs V4 once per database, so `docker compose down -v` is the way to get a pristine copy back. The password is published in the repository, so the account is for exploring only.
 
-## 12. Errors
+## 13. Errors
 
 Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, sometimes extra fields).
 
@@ -242,7 +261,7 @@ Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, so
 
 To add a new error type: create an exception in `common/exception`, throw it from a service, add one `@ExceptionHandler` method to `GlobalExceptionHandler`.
 
-## 13. Configuration
+## 14. Configuration
 
 All in `src/main/resources/application.yml`.
 
@@ -256,15 +275,17 @@ All in `src/main/resources/application.yml`.
 | `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required, at least 32 characters. Locally from `jobtrackr-backend/.env.properties` (git-ignored, pulled in by `spring.config.import`); a real environment variable overrides it |
 | `jobtrackr.jwt.access-token-ttl` | `15m` | Token lifetime |
 | `jobtrackr.cors.allowed-origins` | `${CORS_ALLOWED_ORIGINS:http://localhost:4200}` | Browser origins allowed to call the API |
+| `notifications.zone` | `${NOTIFICATIONS_ZONE:Asia/Kolkata}` | The zone in which "today" is decided for follow-up dates |
+| `notifications.upcoming-days` | `7` | How far ahead the bell lists upcoming follow-ups (0 to 30) |
 
 The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main` (and in the surefire configuration for tests). All timestamps are `TIMESTAMPTZ` in the database and `Instant` in Java; converting to local time is the client's job.
 
-## 14. Tests
+## 15. Tests
 
 | Kind | Examples | What they prove |
 |---|---|---|
-| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest`, `StatsServiceTest` | The service logic, especially the move arithmetic. Fast |
-| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
+| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest` | The service logic, especially the move arithmetic. Fast |
+| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
 
 Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` replaces `CurrentUserProvider` with a mock and skips the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters.
 

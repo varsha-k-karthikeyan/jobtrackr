@@ -20,7 +20,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 ## Stack
 
 - Backend: `jobtrackr-backend` — Spring Boot 4.1.x, Java 21, Maven (use the wrapper, `mvnw.cmd`)
-- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Mail, Lombok
+- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Lombok
 - springdoc-openapi 3.x for Swagger UI (the 3.x line is the one for Boot 4; its version is pinned in `pom.xml`)
 - PostgreSQL 16 in Docker (`docker-compose.yml` at this root)
 - Tests: JUnit 5, Mockito, AssertJ, MockMvc
@@ -38,6 +38,7 @@ docker compose up -d
 
 # 2. Backend. JWT_SECRET (min 32 chars) comes from jobtrackr-backend/.env.properties
 #    (git-ignored, imported by application.yml); a real environment variable overrides it.
+#    Every variable, with placeholders only, is listed in .env.example at the root (committed on purpose).
 cd "E:\JobTrackr project\jobtrackr-backend"
 .\mvnw.cmd spring-boot:run        # or: mvn spring-boot:run
 
@@ -58,7 +59,7 @@ npm test           # unit tests (Vitest)
 
 ## Working rules
 
-- **Package by feature**, not by layer: `common`, `user`, `application`, `note`, `auth`, `stats`. Each feature holds its own entity, repository, service, controller, mapper and `dto` package.
+- **Package by feature**, not by layer: `common`, `user`, `application`, `note`, `auth`, `stats`, `notification`. Each feature holds its own entity, repository, service, controller, mapper and `dto` package.
 - **DTOs are Java records.** Never return or accept JPA entities in controllers. Map with the hand-written mappers.
 - **Constructor injection only** (Lombok `@RequiredArgsConstructor` on final fields). No field `@Autowired`.
 - **Schema changes only through Flyway** migrations in `src/main/resources/db/migration`. `ddl-auto` stays `validate`. Never edit a migration that has been applied; add a new `V<n>__description.sql`.
@@ -75,7 +76,7 @@ npm test           # unit tests (Vitest)
 - **New control flow** (`@if`, `@for`, `@switch`, `@let`). Code must work with OnPush (the Angular 22 default) and zoneless.
 - **Functional interceptors and guards** (`core/interceptors`, `core/guards`). **Typed reactive forms.** Lazy routes with `loadComponent`.
 - **UI: Angular Material (+ CDK) and Tailwind CSS only**, no other UI library. Material for interactive widgets; Tailwind for layout. Tailwind sits in cascade layers and loses to Material on Material elements, so put utilities on a plain wrapper, never on a Material component, and colour custom pieces with the `--mat-sys-*` theme variables or `mat.*-overrides` mixins.
-- **Folders:** `core` (api, auth, interceptors, guards, models, state, notifications, layout), `features/{auth,board,list,stats}`, `shared` (components, validators, utils).
+- **Folders:** `core` (api, auth, interceptors, guards, models, state, notifications (snackbar `Notifier` and the bell's `NotificationStore`), layout), `features/{auth,board,list,stats}`, `shared` (components, validators, utils).
 - **State:** board state lives in `ApplicationStore` (immutable updates via the pure functions in `board-state.ts`; mutations return Promises). Components never call `HttpClient` directly; the list page is the only direct caller of `ApplicationApiService` (`list()`).
 - **Sessions:** 15-minute access token (localStorage, `Authorization` header) + 14-day refresh token in an httpOnly cookie that JavaScript never sees. All `/auth/*` calls use `withCredentials: true`. On a 401 the auth interceptor does one shared refresh and one retry; guards restore the session after a reload. Never put the refresh token anywhere JavaScript can read.
 - **Errors:** the error interceptor shows one snackbar per failed request; a caller that shows the error itself passes `{ skipErrorToast: true }` (`SKIP_ERROR_TOAST`). 401s are owned by the auth interceptor.
@@ -102,4 +103,4 @@ npm test           # unit tests (Vitest)
 
 ## Not built yet
 
-Resumes and AI match (`resumes` and `match_results` tables exist but have no entities), follow-up reminder emails, deployment, cleanup of expired refresh-token rows.
+Resumes and AI match (`resumes` and `match_results` tables exist but have no entities), deployment, cleanup of expired refresh-token rows. Follow-up reminders are in-app only (the header bell, `notification` package); there is deliberately no email or SMTP.

@@ -2,3 +2,6 @@
 jobtrackr:
   jwt:
     secret: test-only-signing-key-not-used-anywhere-else-0123456789
+  # No background jobs during tests: they would run on their own schedule, outside each test's transaction
+  scheduling:
+    enabled: false

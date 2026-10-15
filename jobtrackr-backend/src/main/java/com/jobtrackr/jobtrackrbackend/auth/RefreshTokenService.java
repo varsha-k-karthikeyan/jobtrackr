@@ -28,6 +28,13 @@ public class RefreshTokenService {
      */
     static final Duration REUSE_GRACE_PERIOD = Duration.ofSeconds(30);
 
+    /**
+     * How long an expired row is kept before the cleanup job deletes it. Not zero on purpose: a revoked row
+     * is the evidence for reuse detection, and a stolen copy replayed just after expiry should still trigger
+     * "revoke everything" rather than look like an unknown token.
+     */
+    static final Duration EXPIRED_TOKEN_RETENTION = Duration.ofDays(7);
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int TOKEN_BYTES = 32; // 256 bits
 
@@ -73,6 +80,15 @@ public class RefreshTokenService {
 
         current.setRevokedAt(now);
         return new Rotation(current.getUser(), issue(current.getUser()));
+    }
+
+    /**
+     * Deletes rows that expired more than EXPIRED_TOKEN_RETENTION ago. Revoked tokens that have not expired
+     * yet are kept: reuse detection needs them. Returns the number of rows deleted.
+     */
+    @Transactional
+    public int deleteExpiredTokens() {
+        return refreshTokenRepository.deleteExpiredBefore(clock.instant().minus(EXPIRED_TOKEN_RETENTION));
     }
 
     /** Logout: the token stops working immediately. Unknown or already revoked tokens are ignored. */

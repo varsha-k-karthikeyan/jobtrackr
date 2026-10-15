@@ -117,6 +117,16 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void deleteExpiredTokens_deletesOnlyRowsExpiredMoreThanSevenDaysAgo() {
+        when(repository.deleteExpiredBefore(any())).thenReturn(3);
+
+        int deleted = service.deleteExpiredTokens();
+
+        assertThat(deleted).isEqualTo(3);
+        verify(repository).deleteExpiredBefore(NOW.minus(Duration.ofDays(7)));
+    }
+
+    @Test
     void hash_isAStableHexSha256() {
         assertThat(RefreshTokenService.hash("abc"))
                 .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");

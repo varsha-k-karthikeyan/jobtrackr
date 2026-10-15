@@ -59,3 +59,11 @@ jobtrackr:
     # Comma-separated; add the deployed frontend URL through the environment, e.g.
     # CORS_ALLOWED_ORIGINS=http://localhost:4200,https://jobtrackr.example.com
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  # Background jobs (common/config/SchedulingConfig). Tests switch them off in application-test.yml.
+  scheduling:
+    enabled: ${SCHEDULING_ENABLED:true}
+  # Nightly delete of refresh-token rows that expired over 7 days ago (auth/RefreshTokenCleanupJob).
+  # Spring cron: second minute hour day-of-month month day-of-week. Default: every day at 03:30, India time.
+  refresh-token-cleanup:
+    cron: ${REFRESH_TOKEN_CLEANUP_CRON:0 30 3 * * *}
+    zone: Asia/Kolkata

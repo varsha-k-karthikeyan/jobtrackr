@@ -1,13 +1,13 @@
 # JobTrackr
 
-A job application tracker: a Kanban board for your applications (Applied, Interview, Offer, Rejected), notes per application, and (planned) an AI resume-to-job-description match.
+A job application tracker: a Kanban board for your applications (Applied, Interview, Offer, Rejected), notes per application, follow-up dates with in-app reminders, and a searchable list.
 
-This is a monorepo. Today it contains the Spring Boot backend; the Angular frontend will be added next to it.
+This is a monorepo with the Spring Boot backend and the Angular frontend side by side.
 
 | Path | What it is |
 |---|---|
 | `jobtrackr-backend/` | REST API: Spring Boot 4.1, Java 21, Maven |
-| `jobtrackr-frontend/` | Angular 22 app: Kanban board, list, details drawer, stats (Angular Material + Tailwind CSS; see its README) |
+| `jobtrackr-frontend/` | Angular 22 app: Kanban board, list, details drawer, stats, follow-up bell (Angular Material + Tailwind CSS; see its README) |
 | `docker-compose.yml` | PostgreSQL 16 for local development |
 | `docs/` | Architecture and debugging guides |
 | `commitlint.config.js`, `.husky/`, `package.json` | Commit message linting (repository tooling only) |
@@ -20,12 +20,13 @@ This is a monorepo. Today it contains the Spring Boot backend; the Angular front
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Understand the code structure, the data model and how the main logic works |
 | [docs/DEBUGGING.md](docs/DEBUGGING.md) | Fix a startup failure, an unexpected status code, or wrong card positions |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Add a feature or a migration, and write commit messages that pass the lint |
+| [jobtrackr-frontend/README.md](jobtrackr-frontend/README.md) | Understand the Angular app: structure, state flow, authentication, styling rules |
 
 ## Prerequisites
 
 - JDK 21
 - Docker Desktop
-- Node.js 20 or newer (only for the commit message hook)
+- Node.js 22.22.3+ or 24.15+ (the Angular 22 frontend; the commit message hook also runs on it)
 
 ## Quick start
 
@@ -94,7 +95,14 @@ cd "E:\JobTrackr project\jobtrackr-backend"
 .\mvnw.cmd test
 ```
 
-The Docker database must be running. Integration tests run inside transactions that are rolled back, so they leave no data behind. Tests use their own dummy JWT secret and need no environment variable.
+The Docker database must be running. Integration tests run inside transactions that are rolled back, so they leave no data behind. Tests use their own dummy JWT secret and need no environment variable, and background jobs are switched off during tests.
+
+Frontend unit tests (Vitest) need neither the backend nor the database:
+
+```powershell
+cd "E:\JobTrackr project\jobtrackr-frontend"
+npm test -- --watch=false
+```
 
 ## API at a glance
 
@@ -102,8 +110,10 @@ Base path `/api/v1`. Everything except `/auth/**` needs `Authorization: Bearer <
 
 | Method and path | Purpose |
 |---|---|
-| `POST /auth/register` | Create an account; returns an access token |
-| `POST /auth/login` | Returns a 15-minute access token |
+| `POST /auth/register` | Create an account; returns a 15-minute access token and sets the refresh-token cookie |
+| `POST /auth/login` | Returns a 15-minute access token and sets the 14-day refresh-token cookie (httpOnly) |
+| `POST /auth/refresh` | No body: the browser sends the cookie. Rotates the refresh token and returns a new access token |
+| `POST /auth/logout` | Revokes the refresh token and deletes the cookie |
 | `GET /me` | The caller's profile |
 | `GET /applications/board` | All cards grouped by status, ordered by position |
 | `GET /applications?status=&searchText=&salaryFrom=&salaryTo=&sort=&page=&size=` | Filtered, sorted, paginated list. `searchText` matches company, role, location, source or status; `salaryFrom`/`salaryTo` (LPA) keep jobs whose salary range overlaps that range; `sort` accepts company, role, status, location, salaryMinLpa, salaryMaxLpa, appliedOn (and a few more), empty values last |

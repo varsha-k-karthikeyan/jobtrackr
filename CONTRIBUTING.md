@@ -69,12 +69,12 @@ To add a type or scope, edit `commitlint.config.js` and this table together.
 Accepted:
 
 ```
-feat(application): add follow-up reminder endpoint
+feat(notification): add follow-up notifications for the header bell
 fix(auth): return 401 instead of 500 for a malformed token
 refactor(application): rename q to searchText
 docs: add debugging guide
 build(deps): upgrade springdoc to 3.1.2
-feat(db): add resume tables
+refactor(db): drop the unused resumes and match_results tables
 ```
 
 Rejected, with the reason:
@@ -112,7 +112,7 @@ The short version; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the rea
 - Request and response bodies are Java records in the feature's `dto` package. Entities never appear in a controller signature.
 - Constructor injection only (`@RequiredArgsConstructor` with `final` fields). No field `@Autowired`.
 - The schema changes only through Flyway. `ddl-auto` stays `validate`.
-- Every query is scoped to the current user, whose id comes only from `CurrentUserProvider`.
+- Every query is scoped to the current user, whose id comes only from `CurrentUserProvider`. The only exception is a scheduled job's housekeeping query (the nightly refresh-token cleanup), which has no user and is never reachable from a controller.
 - Names are meaningful and unabbreviated: `searchText`, not `q`.
 - Every service method has a unit test.
 - Comments explain why, not what.
@@ -146,6 +146,11 @@ Create `com.jobtrackr.jobtrackrbackend.<feature>` with entity, repository, servi
 ```powershell
 cd "E:\JobTrackr project\jobtrackr-backend"
 .\mvnw.cmd test
+
+# If the frontend changed
+cd "E:\JobTrackr project\jobtrackr-frontend"
+npm test -- --watch=false
+npm run build      # also checks the 500 kB initial bundle budget
 ```
 
-All tests must pass. Check `git status` and make sure no `.env` file, secret or `target/` output is staged.
+All tests must pass. Check `git status` and make sure no `.env` or `.env.properties` file, secret or `target/` output is staged (`.env.example`, with placeholders only, is the one env file that is committed). When a backend DTO changes, update its TypeScript mirror in `jobtrackr-frontend/src/app/core/models` in the same commit.

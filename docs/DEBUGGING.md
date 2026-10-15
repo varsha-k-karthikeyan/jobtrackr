@@ -102,6 +102,8 @@ An exception with no handler. The stack trace is in the application log. Find th
 | Login fails with correct details | `AuthService.login`; check the normalised email and that `password_hash` starts with `$2` |
 | A field is missing or null in the response | `ApplicationMapper`: was the field added to `toResponse`, `toEntity` and `applyUpdate`? |
 | A validation message is wrong | The annotations on the request record; then `GlobalExceptionHandler.handleMethodArgumentNotValid` |
+| The bell shows the wrong follow-ups or count | `NotificationService.getNotifications`; check `today` (decided in `notifications.zone`) and the rows from `findOpenFollowUps` |
+| Old refresh-token rows are not cleaned up | `RefreshTokenCleanupJob.deleteExpiredTokens`; the log prints `Refresh-token cleanup deleted N expired row(s)` each night. No line at all: `jobtrackr.scheduling.enabled` is false |
 
 ## 5. See what the app is doing
 

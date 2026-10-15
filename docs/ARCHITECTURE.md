@@ -27,7 +27,7 @@ jobtrackr-backend/
     │       └── db/migration/                 Flyway SQL migrations (the only place schema changes)
     └── test/
         ├── java/...                          mirrors the main packages
-        └── resources/application-test.yml    test-only settings (dummy JWT secret)
+        └── resources/application-test.yml    test-only settings (dummy JWT secret, scheduling off)
 ```
 
 The code is **packaged by feature, not by layer**. There is no global `controllers` or `services` package. To work on notes, everything you need is in `note/`.
@@ -186,9 +186,9 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 
 | Step | Where |
 |---|---|
-| Register: validate, lower-case the email, BCrypt the password, save, issue a token | `AuthService.register` |
+| Register: validate, lower-case the email, BCrypt the password, save, then sign in (access token + refresh cookie, like login) | `AuthService.register` |
 | Password rule for new accounts: 8 to 20 characters with at least one uppercase letter, one lowercase letter and one special character (whitespace doesn't count). Enforced by Bean Validation on `RegisterRequest`; the frontend's `password-strength.ts` mirrors it for instant feedback. Login applies no rules | `auth/dto/PasswordPolicy` |
-| Login: find by email, check the password with BCrypt, issue a token. Unknown email and wrong password give the same 401 | `AuthService.login` |
+| Login: find by email, check the password with BCrypt, issue an access token and a refresh cookie. Unknown email and wrong password give the same 401 | `AuthService.login` |
 | Build and sign the token (HS256, subject = user id, expires after `access-token-ttl`) | `TokenService` |
 | Verify the token on every request; decide which paths are public | `SecurityConfig` |
 | Read the user id back out of the verified token | `common/CurrentUserProvider` |
@@ -272,7 +272,9 @@ All in `src/main/resources/application.yml`.
 | `spring.data.web.pageable.max-page-size` | `100` | Upper limit for `?size=` |
 | `spring.docker.compose.enabled` | `false` | Docker is started by hand |
 | `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required, at least 32 characters. Locally from `jobtrackr-backend/.env.properties` (git-ignored, pulled in by `spring.config.import`); a real environment variable overrides it |
-| `jobtrackr.jwt.access-token-ttl` | `15m` | Token lifetime |
+| `jobtrackr.jwt.access-token-ttl` | `15m` | Access token lifetime; short because the frontend renews it silently |
+| `jobtrackr.jwt.refresh-token-ttl` | `14d` | How long a session survives without use; rotated on every refresh |
+| `jobtrackr.jwt.refresh-cookie-secure` | `${REFRESH_COOKIE_SECURE:false}` | The cookie's `Secure` flag; `false` for `http://localhost`, `true` wherever the API is served over HTTPS |
 | `jobtrackr.scheduling.enabled` | `${SCHEDULING_ENABLED:true}` | Turns background jobs on (`common/config/SchedulingConfig`); `false` in tests |
 | `jobtrackr.refresh-token-cleanup.cron` / `.zone` | `0 30 3 * * *`, `Asia/Kolkata` | When the expired refresh-token cleanup runs (cron overridable with `REFRESH_TOKEN_CLEANUP_CRON`) |
 | `jobtrackr.cors.allowed-origins` | `${CORS_ALLOWED_ORIGINS:http://localhost:4200}` | Browser origins allowed to call the API |
@@ -285,9 +287,9 @@ The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main`
 
 | Kind | Examples | What they prove |
 |---|---|---|
-| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest` | The service logic, especially the move arithmetic. Fast |
+| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `RefreshTokenServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest`, `RegisterRequestValidationTest` (the password policy) | The service logic, especially the move arithmetic, token rotation and expiry with a fixed `Clock`. Fast |
 | Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `RefreshTokenCleanupIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
 
-Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` replaces `CurrentUserProvider` with a mock and skips the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters.
+Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` and `NotificationApiIntegrationTest` replace `CurrentUserProvider` with a mock and skip the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters. No test calls an external service: there is no email, and scheduled jobs are switched off (`jobtrackr.scheduling.enabled=false` in `application-test.yml`); `RefreshTokenCleanupIntegrationTest` calls the job method directly.
 
 Every service method has a unit test. Keep it that way.

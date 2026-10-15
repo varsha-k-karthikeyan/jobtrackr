@@ -1,6 +1,6 @@
 # JobTrackr frontend
 
-Angular 22 single-page app for JobTrackr: a Kanban board with drag and drop, a searchable list, a details drawer with notes, and stats. Standalone components, Signals, Angular Material and Tailwind CSS.
+Angular 22 single-page app for JobTrackr: a Kanban board with drag and drop, a searchable list, a details drawer with notes, stats, and a follow-up bell in the header. Standalone components, Signals, Angular Material and Tailwind CSS.
 
 Project-wide documentation (setup, backend architecture, debugging, commit rules) lives at the monorepo root: see [../README.md](../README.md) and [../docs](../docs).
 
@@ -111,7 +111,8 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 
 | Spec | Covers |
 |---|---|
-| `core/state/application-store.spec.ts` | Load, optimistic move, rollback on failure, reload on 409, cleared on logout, stale responses dropped |
+| `core/state/application-store.spec.ts` | Load, optimistic move, rollback on failure, reload on 409, cleared on logout, stale responses dropped, `revision` bumped only by successful changes |
+| `core/notifications/notification-store.spec.ts` | Due vs upcoming and the badge count, a failed refresh keeps the last list, dismiss one / all, responses after logout dropped, `followUpLabel` wording |
 | `core/state/board-state.spec.ts` | Pure move/insert/remove maths, clamping, immutability |
 | `core/auth/auth-service.spec.ts` | Token persistence, restore and expiry on startup, one shared refresh, silent restore from the cookie, logout |
 | `core/interceptors/auth-interceptor.spec.ts` | Bearer only to our API, refresh + single retry on 401, one refresh for simultaneous 401s, no refresh loop, logout when the refresh fails |

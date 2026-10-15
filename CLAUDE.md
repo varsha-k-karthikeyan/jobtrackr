@@ -1,6 +1,6 @@
 # JobTrackr
 
-Job application tracker: Kanban board plus AI resume match. Monorepo; the git repository is at this root, not inside `jobtrackr-backend`.
+Job application tracker: Kanban board, searchable list and in-app follow-up reminders. Monorepo; the git repository is at this root, not inside `jobtrackr-backend`.
 
 The owner is a senior Angular developer learning Spring Boot. After each piece of work, briefly explain the key design decisions, because the code must be explained in interviews. Work one stage at a time, say exactly how to verify it, and wait for "next".
 
@@ -15,7 +15,7 @@ Keep these in step with the code: a change to behaviour, configuration or struct
 
 ## Commits
 
-Commit messages are linted by commitlint through a husky `commit-msg` hook (`commitlint.config.js`). Format: `<type>(<scope>): <subject>`, for example `feat(application): add follow-up reminder endpoint`. The allowed types and scopes are listed in `CONTRIBUTING.md`. Subject in lower case, imperative, no full stop, header at most 100 characters. Do not bypass the hook with `--no-verify`.
+Commit messages are linted by commitlint through a husky `commit-msg` hook (`commitlint.config.js`). Format: `<type>(<scope>): <subject>`, for example `feat(notification): add follow-up notifications for the header bell`. The allowed types and scopes are listed in `CONTRIBUTING.md`. Subject in lower case, imperative, no full stop, header at most 100 characters. Do not bypass the hook with `--no-verify`.
 
 ## Stack
 
@@ -65,7 +65,7 @@ npm test           # unit tests (Vitest)
 - **Schema changes only through Flyway** migrations in `src/main/resources/db/migration`. `ddl-auto` stays `validate`. Never edit a migration that has been applied; add a new `V<n>__description.sql`.
 - **Test every service method** with a mocked unit test. Add an integration test when the behaviour depends on real SQL or the security filter chain.
 - **Meaningful names** for variables, parameters, query parameters and columns. No abbreviations such as `q` or `cb`; write `searchText`, `criteriaBuilder`.
-- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404.
+- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404. The only exception is a scheduled job's housekeeping query (`RefreshTokenRepository.deleteExpiredBefore`), never reachable from a controller.
 - **Comments explain why, not what**, and every class has a short comment stating its role. Schema documentation lives in `COMMENT ON` statements (see `V3__schema_comments.sql`).
 - Entities use Lombok `@Getter`/`@Setter` (not `@Data`), lazy `@ManyToOne`, and no `@OneToMany` collections.
 

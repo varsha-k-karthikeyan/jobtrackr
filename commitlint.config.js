@@ -3,7 +3,7 @@
 //
 //   <type>(<scope>): <subject>
 //
-//   feat(application): add follow-up reminder endpoint
+//   feat(notification): add follow-up notifications for the header bell
 //   fix(auth): reject tokens signed with an old secret
 //
 // See CONTRIBUTING.md for the full guide.
@@ -30,7 +30,7 @@ module.exports = {
       'db',       // Flyway migrations
       'config',   // application.yml, pom.xml settings
       'docker',   // docker-compose.yml
-      'frontend', // Angular app (later)
+      'frontend', // Angular app (jobtrackr-frontend)
       'deps',     // dependency upgrades
       'docs',
       'repo',     // root tooling: git hooks, .gitignore, commitlint

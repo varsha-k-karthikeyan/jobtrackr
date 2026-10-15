@@ -5,8 +5,17 @@
 target/
 .mvn/wrapper/maven-wrapper.jar
 
-# npm packages (root commit tooling now, the Angular app later)
+# npm packages (root commit tooling and the Angular app)
 node_modules/
+
+# Angular build output and caches (jobtrackr-frontend)
+dist/
+.angular/
+out-tsc/
+coverage/
+.sass-cache/
+__screenshots__/
+npm-debug.log
 
 # IDE files
 .idea/

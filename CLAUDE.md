@@ -9,6 +9,7 @@ The owner is a senior Angular developer learning Spring Boot. After each piece o
 - `docs/ARCHITECTURE.md`: code structure, data model, and how the move, optimistic-locking and auth logic work. Read it before changing code.
 - `docs/DEBUGGING.md`: symptom-to-fix tables for startup failures, status codes, positions and tests.
 - `CONTRIBUTING.md`: commit format and step-by-step recipes (add a column, an endpoint, a feature).
+- `jobtrackr-frontend/README.md`: frontend structure, state flow and conventions.
 
 Keep these in step with the code: a change to behaviour, configuration or structure updates the matching document in the same commit.
 
@@ -23,7 +24,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 - springdoc-openapi 3.x for Swagger UI (the 3.x line is the one for Boot 4; its version is pinned in `pom.xml`)
 - PostgreSQL 16 in Docker (`docker-compose.yml` at this root)
 - Tests: JUnit 5, Mockito, AssertJ, MockMvc
-- Frontend (later): Angular
+- Frontend: `jobtrackr-frontend` — Angular 22 (standalone, zoneless, OnPush by default), Angular Material 22 + CDK, Tailwind CSS 4, Vitest. Needs Node 22.22.3+ or 24.15+
 - Base package: `com.jobtrackr.jobtrackrbackend`
 
 ## Run commands
@@ -35,21 +36,29 @@ Windows, PowerShell. Quote paths that contain spaces.
 cd "E:\JobTrackr project"
 docker compose up -d
 
-# 2. Backend (JWT_SECRET is required, at least 32 characters)
+# 2. Backend. JWT_SECRET (min 32 chars) comes from jobtrackr-backend/.env.properties
+#    (git-ignored, imported by application.yml); a real environment variable overrides it.
 cd "E:\JobTrackr project\jobtrackr-backend"
-$env:JWT_SECRET = "<your secret>"
 .\mvnw.cmd spring-boot:run        # or: mvn spring-boot:run
 
 # 3. Tests (the Docker database must be running; tests use their own dummy JWT secret)
 .\mvnw.cmd test
+
+# 4. Frontend (the backend must be running on :8080)
+cd "E:\JobTrackr project\jobtrackr-frontend"
+npm install        # first time only (use npm.cmd if PowerShell blocks npm.ps1)
+npm start          # http://localhost:4200
+npm test           # unit tests (Vitest)
 ```
+
+- Demo login: `demo@jobtrackr.dev` / `Demo@1234` (or "Try the demo" on the login page)
 
 - Swagger UI: http://localhost:8080/swagger-ui.html (register or log in, then use Authorize with the access token)
 - `docker compose down` keeps the data; `docker compose down -v` wipes it
 
 ## Working rules
 
-- **Package by feature**, not by layer: `common`, `user`, `application`, `note`, `auth`. Each feature holds its own entity, repository, service, controller, mapper and `dto` package.
+- **Package by feature**, not by layer: `common`, `user`, `application`, `note`, `auth`, `stats`. Each feature holds its own entity, repository, service, controller, mapper and `dto` package.
 - **DTOs are Java records.** Never return or accept JPA entities in controllers. Map with the hand-written mappers.
 - **Constructor injection only** (Lombok `@RequiredArgsConstructor` on final fields). No field `@Autowired`.
 - **Schema changes only through Flyway** migrations in `src/main/resources/db/migration`. `ddl-auto` stays `validate`. Never edit a migration that has been applied; add a new `V<n>__description.sql`.
@@ -59,12 +68,27 @@ $env:JWT_SECRET = "<your secret>"
 - **Comments explain why, not what**, and every class has a short comment stating its role. Schema documentation lives in `COMMENT ON` statements (see `V3__schema_comments.sql`).
 - Entities use Lombok `@Getter`/`@Setter` (not `@Data`), lazy `@ManyToOne`, and no `@OneToMany` collections.
 
+## Frontend rules
+
+- **Standalone components only**, no NgModules. `inject()` instead of constructor injection. Strict TypeScript, no `any`.
+- **Signals for state** (`signal`, `computed`; `effect` sparingly). RxJS only where it fits: HTTP and debouncing.
+- **New control flow** (`@if`, `@for`, `@switch`, `@let`). Code must work with OnPush (the Angular 22 default) and zoneless.
+- **Functional interceptors and guards** (`core/interceptors`, `core/guards`). **Typed reactive forms.** Lazy routes with `loadComponent`.
+- **UI: Angular Material (+ CDK) and Tailwind CSS only**, no other UI library. Material for interactive widgets; Tailwind for layout. Tailwind sits in cascade layers and loses to Material on Material elements, so put utilities on a plain wrapper, never on a Material component, and colour custom pieces with the `--mat-sys-*` theme variables or `mat.*-overrides` mixins.
+- **Folders:** `core` (api, auth, interceptors, guards, models, state, notifications, layout), `features/{auth,board,list,stats}`, `shared` (components, validators, utils).
+- **State:** board state lives in `ApplicationStore` (immutable updates via the pure functions in `board-state.ts`; mutations return Promises). Components never call `HttpClient` directly; the list page is the only direct caller of `ApplicationApiService` (`list()`).
+- **Errors:** the error interceptor shows one snackbar per failed request; a caller that shows the error itself passes `{ skipErrorToast: true }` (`SKIP_ERROR_TOAST`). 401s are owned by the auth interceptor.
+- **Model types mirror the backend records field for field** (`core/models`); when a DTO changes, update both in the same commit.
+- **No secrets in the frontend.** `apiBaseUrl` comes from `src/environments`. The demo credentials constant is public on purpose.
+- **Form field spacing:** stack `mat-form-field`s with `gap-4` (16px) on the plain wrapper (`flex flex-col gap-4`, or `gap-y-4` in a grid). An outlined field's floating label sits above its box, so anything tighter makes an error or hint touch the next label. Keep hints to one line.
+- Keep the initial bundle under the 500 kB budget: anything only needed on demand (snackbar from interceptors, datepicker setup) is loaded lazily.
+
 ## API conventions
 
 - Base path `/api/v1`. Everything needs a Bearer token except `/api/v1/auth/**` and the Swagger paths.
 - POST returns 201 with a `Location` header and the created object; PUT returns 200 with the updated object; DELETE returns 204.
 - Errors are RFC 9457 `ProblemDetail` from `GlobalExceptionHandler`: 400 validation (with an `errors` map), 401 bad credentials, 404 not found, 409 conflict or stale `version`.
-- `PUT /applications/{id}` requires the `version` last read (optimistic locking). Status and position change only through `PATCH /applications/{id}/move`.
+- `PUT /applications/{id}` requires the `version` last read (optimistic locking). Its optional `status` moves the card to the bottom of that column in the same transaction (null keeps it). An exact position is only set through `PATCH /applications/{id}/move` (drag and drop).
 - Lists return `PageResponse`; sortable fields are whitelisted in `ApplicationService`.
 
 ## Things that are easy to trip over
@@ -72,8 +96,9 @@ $env:JWT_SECRET = "<your secret>"
 - The JVM runs in UTC (set in `main` and in the surefire config). Windows reports the zone as `Asia/Calcutta`, which the `postgres:16` image rejects on connect.
 - A locally installed PostgreSQL service on port 5432 hides the Docker container and causes "password authentication failed". Stop the Windows service before starting the container.
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
-- The seeded demo user (id 1) has a placeholder password hash and cannot log in.
+- Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
+- CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.
 
 ## Not built yet
 
-Refresh tokens, resumes and AI match (`resumes` and `match_results` tables exist but have no entities), follow-up reminder emails, the Angular frontend, CORS configuration.
+Refresh tokens, resumes and AI match (`resumes` and `match_results` tables exist but have no entities), follow-up reminder emails, deployment.

@@ -7,6 +7,7 @@ This is a monorepo. Today it contains the Spring Boot backend; the Angular front
 | Path | What it is |
 |---|---|
 | `jobtrackr-backend/` | REST API: Spring Boot 4.1, Java 21, Maven |
+| `jobtrackr-frontend/` | Angular 22 app: Kanban board, list, details drawer, stats (Angular Material + Tailwind CSS; see its README) |
 | `docker-compose.yml` | PostgreSQL 16 for local development |
 | `docs/` | Architecture and debugging guides |
 | `commitlint.config.js`, `.husky/`, `package.json` | Commit message linting (repository tooling only) |
@@ -38,25 +39,42 @@ docker compose up -d
 # 2. Install the commit hook (once per clone)
 npm install
 
-# 3. Start the backend. JWT_SECRET is required: any random string of at least 32 characters
+# 3. Create the local secrets file once (see below), then start the backend
 cd "E:\JobTrackr project\jobtrackr-backend"
-$env:JWT_SECRET = "<your secret>"
-.\mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run        # or run JobtrackrBackendApplication in IntelliJ
 ```
 
-To generate a secret:
+### The JWT secret
+
+The backend needs `JWT_SECRET`, any random string of at least 32 characters, to sign login tokens. For local development, put it in `jobtrackr-backend/.env.properties`, which Spring reads at startup and git ignores. It works the same from IntelliJ, Maven or a terminal. Create it once:
 
 ```powershell
-$bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes); [Convert]::ToBase64String($bytes)
+cd "E:\JobTrackr project\jobtrackr-backend"
+$bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+"JWT_SECRET=$([Convert]::ToBase64String($bytes))" | Out-File -Encoding ascii .env.properties
 ```
 
-In IntelliJ, put `JWT_SECRET=<your secret>` in the run configuration's environment variables instead.
+A real `JWT_SECRET` environment variable, if set, takes priority over the file; that is how a deployed server would provide it. Keep the value stable: changing it logs out everyone who holds a token.
+
+Optional: `CORS_ALLOWED_ORIGINS` lists the browser origins allowed to call the API (comma-separated). It defaults to `http://localhost:4200`, the Angular dev server.
 
 Then open Swagger UI at http://localhost:8080/swagger-ui.html:
 
 1. Call `POST /api/v1/auth/register` (or `/login`) and copy `accessToken` from the response.
 2. Click **Authorize**, paste the token (without the word "Bearer").
 3. Every other endpoint now works.
+
+### The app
+
+With the backend running:
+
+```powershell
+cd "E:\JobTrackr project\jobtrackr-frontend"
+npm install        # first time only
+npm start
+```
+
+Open http://localhost:4200 and click **Try the demo**, or register your own account. Node 22.22.3+ or 24.15+ is required (Angular 22).
 
 ## Tests
 
@@ -77,19 +95,40 @@ Base path `/api/v1`. Everything except `/auth/**` needs `Authorization: Bearer <
 | `POST /auth/login` | Returns a 15-minute access token |
 | `GET /me` | The caller's profile |
 | `GET /applications/board` | All cards grouped by status, ordered by position |
-| `GET /applications?status=&searchText=&sort=&page=&size=` | Filtered, sorted, paginated list |
+| `GET /applications?status=&searchText=&salaryFrom=&salaryTo=&sort=&page=&size=` | Filtered, sorted, paginated list. `searchText` matches company, role, location, source or status; `salaryFrom`/`salaryTo` (LPA) keep jobs whose salary range overlaps that range; `sort` accepts company, role, status, location, salaryMinLpa, salaryMaxLpa, appliedOn (and a few more), empty values last |
 | `POST /applications` | Create a card (appended to the bottom of its column) |
 | `GET /applications/{id}` | One card with its notes |
-| `PUT /applications/{id}` | Replace the editable fields; needs the current `version` |
+| `PUT /applications/{id}` | Replace the editable fields; needs the current `version`. A new `status` moves the card to the bottom of that column |
 | `PATCH /applications/{id}/move` | Move a card to a column and position |
 | `DELETE /applications/{id}` | Delete a card |
 | `POST /applications/{id}/notes` | Add a note |
 | `DELETE /notes/{id}` | Delete a note |
+| `GET /stats` | Counts per status, total and response rate |
 
 Swagger UI is the full, always-current reference.
 
+## Demo account
+
+Log in with **demo@jobtrackr.dev** / **Demo@1234** to explore a board with 16 sample applications, notes and follow-up dates. The account is created by the Flyway migration `V4__demo_user_data.sql`.
+
+The data is not stored in this repository: the migration recreates it in your own local database, so every setup gets its own private copy. Changes you make to the demo board stay on your machine. Dates are calculated from the day the migration runs, so the board always shows recent applications and follow-ups that are due.
+
+The password is published here on purpose, so use the demo account for exploring and register your own account for real use.
+
+To reset the demo data to its original state (this also deletes any accounts you registered locally):
+
+```powershell
+cd "E:\JobTrackr project"
+docker compose down -v
+docker compose up -d
+```
+
+Then start the backend; Flyway rebuilds the database from the migrations.
+
 ## Status
 
-Built: Kanban API (CRUD, move, notes), validation and error handling, JWT authentication, tests.
+Built:
+- Backend: Kanban API (CRUD, move, notes), stats, validation and error handling, JWT authentication, CORS, a public demo account, tests.
+- Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, tests.
 
-Not built yet: refresh tokens, resume upload and AI match, follow-up reminder emails, CORS configuration, the Angular frontend.
+Not built yet: refresh tokens, resume upload and AI match, follow-up reminder emails, deployment.

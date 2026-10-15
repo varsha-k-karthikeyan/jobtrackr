@@ -10,7 +10,7 @@ Commands are Windows PowerShell. The database container is assumed to be named `
 docker ps                                   # is the postgres:16 container Up?
 Get-NetTCPConnection -LocalPort 5432 -State Listen | ForEach-Object { (Get-Process -Id $_.OwningProcess).ProcessName }
                                             # should list only com.docker.backend
-echo $env:JWT_SECRET                        # set? (terminal runs only; IntelliJ has its own setting)
+Test-Path "E:\JobTrackr project\jobtrackr-backend\.env.properties"   # local JWT_SECRET file present?
 ```
 
 ## 2. The app does not start
@@ -19,8 +19,8 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 
 | Message in the log | Cause | Fix |
 |---|---|---|
-| `Could not resolve placeholder 'JWT_SECRET'` | The environment variable is not set | Terminal: `$env:JWT_SECRET = "..."`. IntelliJ: Run configuration, Environment variables |
-| `jobtrackr.jwt.secret ... must be at least 32 characters` | The secret is too short for HS256 | Use a longer value |
+| `Binding to target ...JwtProperties failed`, `Value: "${JWT_SECRET}"`, `must be at least 32 characters` (or `Could not resolve placeholder 'JWT_SECRET'`) | `JWT_SECRET` is **not set** for this run: Spring left the placeholder as literal text, which then fails the length check | Create `jobtrackr-backend/.env.properties` with a `JWT_SECRET=...` line (command in the README). If it exists, check the run's working directory is `jobtrackr-backend`: the file is found relative to it |
+| `jobtrackr.jwt.secret ... must be at least 32 characters` with your real value shown | The secret is too short for HS256 | Use a value of at least 32 characters |
 | `Connection to localhost:5432 refused` | The database container is not running | `docker compose up -d` from the monorepo root |
 | `password authentication failed for user "jobtrackr"` | A locally installed PostgreSQL service owns port 5432, so the app is talking to the wrong server | In an administrator PowerShell: `Stop-Service postgresql-x64-18` (use your version), then `docker compose down` and `docker compose up -d` |
 | `password authentication failed`, and no local PostgreSQL | The data volume was first created with different credentials | `docker compose down -v` then `docker compose up -d`. This deletes all data |
@@ -41,7 +41,7 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 | No `Authorization` header sent | In Swagger, click **Authorize** and paste the token without the word "Bearer" |
 | It worked 15 minutes ago | The token expired. Log in again |
 | It worked before the last restart | `JWT_SECRET` changed between runs; old tokens no longer verify. Log in again |
-| Body says `Invalid email or password` | That is the login endpoint. The same message is used for an unknown email on purpose. The seeded demo user (id 1) can never log in |
+| Body says `Invalid email or password` | That is the login endpoint. The same message is used for an unknown email on purpose. The demo account's password is `Demo@1234`; if that fails, check that `V4__demo_user_data.sql` has run (`flyway_schema_history`) |
 
 ### 404 on a record you can see in the database
 
@@ -65,6 +65,23 @@ To see whose token you hold, call `GET /api/v1/me`.
 - Body has an `errors` map: Bean Validation rejected those fields. The rules are the annotations on the request record in the feature's `dto` package.
 - Body has no `errors` map: the JSON could not be read at all. Typical causes are an unknown status (`"HIRED"`), a date not in `yyyy-MM-dd` form, a trailing comma, or text in a number field.
 - `Cannot sort by '...'`: only the fields listed in `ApplicationService.SORTABLE_FIELDS` are allowed.
+
+### CORS error in the browser console
+
+`blocked by CORS policy` means the browser refused to show the response to JavaScript; the request may well have reached the server.
+
+| Message | Cause | Fix |
+|---|---|---|
+| `No 'Access-Control-Allow-Origin' header is present` | The page's origin is not in the allowed list | Add it to `CORS_ALLOWED_ORIGINS` (comma-separated; exact scheme, host and port; no trailing slash) and restart |
+| Preflight returns 401 | CORS is not enabled in the security chain | `SecurityConfig` must call `.cors(Customizer.withDefaults())` |
+| Preflight returns 403 | The origin, method or a request header is not allowed | Compare with `CorsConfig`: only the `Authorization` and `Content-Type` request headers are allowed |
+| The app cannot read the `Location` header of a 201 | The header is not exposed | `CorsConfig.setExposedHeaders` |
+
+Test a preflight without a browser:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing -Method Options http://localhost:8080/api/v1/applications -Headers @{ Origin = 'http://localhost:4200'; 'Access-Control-Request-Method' = 'GET' }
+```
 
 ### 500
 
@@ -164,6 +181,23 @@ $part += '=' * ((4 - $part.Length % 4) % 4)
 | `UnnecessaryStubbingException` | A `when(...)` in the test is never used by that test. Remove it, or mark shared setup stubs `lenient()` |
 | Tests pass in Maven but fail in IntelliJ with the time zone error | IntelliJ did not import the surefire `argLine`. Reload the Maven project, or add `-Duser.timezone=UTC` to the JUnit run configuration template |
 
-## 9. The commit is rejected
+## 9. Frontend problems
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `npm : File ... npm.ps1 cannot be loaded because running scripts is disabled` | PowerShell execution policy | Use `npm.cmd`, or once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `ng` refuses to run: Node version not supported | Angular 22 needs Node 22.22.3+ or 24.15+ | `winget install OpenJS.NodeJS.LTS`, then reopen the terminal |
+| Login page says "Can't reach the server" | Backend not running, or `apiBaseUrl` in `src/environments` points elsewhere | Start the backend; check the URL |
+| Browser console: `blocked by CORS policy` | The page's origin is not allowed | See "CORS error in the browser console" above; the default allows only `http://localhost:4200` |
+| Every page bounces to /login with "session expired" | The stored token no longer verifies (backend secret changed, or the user was deleted) | Log in again; the interceptor already cleared the bad token |
+| Board shows "Couldn't load your board" | `GET /applications/board` failed | Network tab shows the status; press Retry once fixed |
+| A dragged card snaps back with "Couldn't move ..." | `PATCH /move` failed with a non-409 error | Network tab; on 404/409 the board reloads instead |
+| Edit dialog shows "This card was changed elsewhere" | 409: another tab saved the card first | Expected. The form now holds the latest version; edit and save again |
+| Styling on a Material component has no effect | Tailwind utilities are layered and lose to Material | Put the utility on a wrapper element, or use a `mat.*-overrides` mixin |
+| `ng build` warns about the bundle budget | Something heavy was imported eagerly | Load it lazily (see `core/notifications/notifier.ts` and the dialog's own providers) |
+
+Useful tools: the Angular DevTools browser extension (component tree and signal values), and DevTools > Network > right-click a request > **Block request URL** to rehearse failure paths.
+
+## 10. The commit is rejected
 
 `git commit` prints `✖ ... [type-enum]` or similar: the message does not follow the format. See [CONTRIBUTING.md](../CONTRIBUTING.md). If no check runs at all, the hook is not installed: run `npm install` in the monorepo root.

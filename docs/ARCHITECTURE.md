@@ -2,6 +2,8 @@
 
 How the JobTrackr backend is organised and how its main logic works. Read this before changing code; read [DEBUGGING.md](DEBUGGING.md) when something is broken.
 
+This document covers the backend. The frontend's structure, data flow and conventions are in [jobtrackr-frontend/README.md](../jobtrackr-frontend/README.md).
+
 All paths below are relative to `jobtrackr-backend/`. The base Java package is `com.jobtrackr.jobtrackrbackend`.
 
 ## 1. Layout
@@ -17,7 +19,8 @@ jobtrackr-backend/
     │   │   ├── note/                         notes attached to an application
     │   │   ├── user/                         the account entity and GET /me
     │   │   ├── auth/                         register, login, JWT, security configuration
-    │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI
+    │   │   ├── stats/                        counts per status and response rate (GET /stats)
+    │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI, CORS
     │   └── resources/
     │       ├── application.yml               all configuration
     │       └── db/migration/                 Flyway SQL migrations (the only place schema changes)
@@ -48,6 +51,7 @@ Dependencies between features:
 - `note` uses `application` (a note needs its parent application to check ownership).
 - `application` uses `note` (the detail view includes notes) and `user` (the owner reference).
 - `auth` uses `user`.
+- `stats` reads the `Application` entity through its own `StatsRepository`.
 - Everything may use `common`. `common` uses no feature.
 
 ## 3. Life of a request
@@ -80,7 +84,7 @@ sequenceDiagram
     Ctl-->>C: 200 + JSON
 ```
 
-Any exception thrown in the controller or below is converted to JSON by `common/exception/GlobalExceptionHandler` (see section 9).
+Any exception thrown in the controller or below is converted to JSON by `common/exception/GlobalExceptionHandler` (see section 12).
 
 ## 4. Data model
 
@@ -114,7 +118,10 @@ This is the most important rule in the codebase.
 
 - The caller's id comes from exactly one place: `common/CurrentUserProvider`, which reads the `sub` claim of the verified JWT. It is never taken from a URL, a query parameter or a request body.
 - Single-record lookups use `findByIdAndUserId(id, userId)`. A record that belongs to someone else is indistinguishable from one that does not exist: both give 404.
-- The list endpoint goes through `ApplicationSpecifications.filter(userId, status, searchText)`, which always includes the owner predicate.
+- The list endpoint goes through `ApplicationSpecifications.filter(userId, filter)`, which always includes the owner predicate. `filter` is the `ApplicationListFilter` record, which Spring MVC binds directly from the query string (`status`, `searchText`, `salaryFrom`, `salaryTo`).
+  - **Salary range (overlap):** a job matches when its `[salaryMinLpa, salaryMaxLpa]` overlaps `[salaryFrom, salaryTo]`, i.e. `COALESCE(max, min) >= salaryFrom AND COALESCE(min, max) <= salaryTo`. `COALESCE` lets a job with only one end act as a single amount; a job with no salary at all only appears when neither bound is given. Negative bounds or `salaryFrom > salaryTo` are a 400. In the frontend this is the two-thumb slider (0 to 100+ LPA) under the list's search box.
+  - `searchText` is a case-insensitive "contains" over company, role, location and source, OR'ed with the status: the text is matched in Java against the enum names (`"off"` → `OFFER`) and becomes `status IN (...)`, so the enum column is never cast to text in SQL.
+  - `sort` must be in `ApplicationService.SORTABLE_FIELDS` (including `location`, `salaryMinLpa`, `salaryMaxLpa`). Every order is rewritten to **nulls last**: PostgreSQL otherwise ranks NULL above every value, so "highest salary first" would start with all the cards that have no salary.
 - Notes are checked through their parent: `findByIdAndApplicationUserId`.
 
 When adding a query, ask: "where is `user_id` in the WHERE clause?" If the answer is "nowhere", it is a bug.
@@ -169,7 +176,9 @@ Details worth knowing:
 
 The comparison in step 3 is written explicitly because Hibernate's automatic check only compares against the row it loaded a moment ago, which is always current. The stale copy lives in the browser.
 
-`PUT` replaces all editable fields: an optional field left out of the body is set to null. `status` and `position` cannot be changed by `PUT`; use the move endpoint.
+`PUT` replaces all editable fields: an optional field left out of the body is set to null. The exception is `status`, which is optional and means "keep the current column" when left out.
+
+Changing `status` through `PUT` (the edit form's Status field) moves the card to the **bottom** of the new column, in the same transaction as the field changes: `ApplicationService.moveToBottomOfColumn` closes the gap in the old column with the same bulk shift a move uses, then appends the card. If the version check fails, nothing moves. `PUT` never takes a `position`; placing a card at an exact spot is what `PATCH /move` (drag and drop) is for.
 
 ## 8. Authentication
 
@@ -178,6 +187,7 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 | Step | Where |
 |---|---|
 | Register: validate, lower-case the email, BCrypt the password, save, issue a token | `AuthService.register` |
+| Password rule for new accounts: 8 to 20 characters with at least one uppercase letter, one lowercase letter and one special character (whitespace doesn't count). Enforced by Bean Validation on `RegisterRequest`; the frontend's `password-strength.ts` mirrors it for instant feedback. Login applies no rules | `auth/dto/PasswordPolicy` |
 | Login: find by email, check the password with BCrypt, issue a token. Unknown email and wrong password give the same 401 | `AuthService.login` |
 | Build and sign the token (HS256, subject = user id, expires after `access-token-ttl`) | `TokenService` |
 | Verify the token on every request; decide which paths are public | `SecurityConfig` |
@@ -188,7 +198,27 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 - There is no server-side session and no logout: a token is valid until it expires (15 minutes). Refresh tokens are not built yet.
 - Restarting with a different `JWT_SECRET` invalidates every token issued before.
 
-## 9. Errors
+## 9. Stats
+
+`GET /api/v1/stats` returns `total`, the four per-status counts and `responseRate`.
+
+- One grouped JPQL query (`StatsRepository.countByStatus`) returns one row per status that has cards. A status with no cards is absent from the result and counts as 0.
+- `responseRate = (interview + offer + rejected) / total`, between 0 and 1, and 0 when `total` is 0. A rejection counts as a response; only cards still in APPLIED are "no answer yet".
+- The query builds `StatusCount` records directly with a JPQL constructor expression, so no entities are loaded.
+
+## 10. CORS
+
+The Angular app runs on a different origin (another port locally, another domain when deployed), so the browser asks permission with a preflight `OPTIONS` request before cross-origin calls.
+
+- `common/config/CorsConfig` defines the rules: allowed origins from `CORS_ALLOWED_ORIGINS`, methods GET, POST, PUT, PATCH, DELETE and OPTIONS, request headers `Authorization` and `Content-Type`, and the `Location` response header exposed to JavaScript.
+- `SecurityConfig` enables it with `.cors(...)`. A preflight carries no token, so without CORS in the security chain it would be rejected with 401 before Spring MVC's own CORS handling ran.
+- No cookies are used, so credentialed CORS is off.
+
+## 11. Demo account
+
+`V4__demo_user_data.sql` gives the V2 demo user (id 1) a real BCrypt hash of the public password `Demo@1234`, deletes any earlier rows of that user, and inserts 16 sample applications (6 / 4 / 2 / 4 across the columns) plus notes. Dates are relative to `CURRENT_DATE` when the migration runs, so a fresh database always has overdue and due-today follow-ups. The data lives only in each developer's local database; Flyway runs V4 once per database, so `docker compose down -v` is the way to get a pristine copy back. The password is published in the repository, so the account is for exploring only.
+
+## 12. Errors
 
 Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, sometimes extra fields).
 
@@ -205,7 +235,7 @@ Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, so
 
 To add a new error type: create an exception in `common/exception`, throw it from a service, add one `@ExceptionHandler` method to `GlobalExceptionHandler`.
 
-## 10. Configuration
+## 13. Configuration
 
 All in `src/main/resources/application.yml`.
 
@@ -216,17 +246,18 @@ All in `src/main/resources/application.yml`.
 | `spring.jpa.open-in-view` | `false` | All database access happens inside the service transaction |
 | `spring.data.web.pageable.max-page-size` | `100` | Upper limit for `?size=` |
 | `spring.docker.compose.enabled` | `false` | Docker is started by hand |
-| `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required environment variable, at least 32 characters |
+| `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required, at least 32 characters. Locally from `jobtrackr-backend/.env.properties` (git-ignored, pulled in by `spring.config.import`); a real environment variable overrides it |
 | `jobtrackr.jwt.access-token-ttl` | `15m` | Token lifetime |
+| `jobtrackr.cors.allowed-origins` | `${CORS_ALLOWED_ORIGINS:http://localhost:4200}` | Browser origins allowed to call the API |
 
 The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main` (and in the surefire configuration for tests). All timestamps are `TIMESTAMPTZ` in the database and `Instant` in Java; converting to local time is the client's job.
 
-## 11. Tests
+## 14. Tests
 
 | Kind | Examples | What they prove |
 |---|---|---|
-| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest` | The service logic, especially the move arithmetic. Fast |
-| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
+| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest`, `StatsServiceTest` | The service logic, especially the move arithmetic. Fast |
+| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
 
 Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` replaces `CurrentUserProvider` with a mock and skips the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters.
 

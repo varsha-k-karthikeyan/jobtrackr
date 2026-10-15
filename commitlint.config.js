@@ -26,7 +26,7 @@ module.exports = {
     ]],
     // Which part of the monorepo is touched. Optional, but when present it must be one of these.
     'scope-enum': [2, 'always', [
-      'application', 'note', 'user', 'auth', 'stats', 'common', // backend feature packages
+      'application', 'note', 'user', 'auth', 'stats', 'notification', 'common', // backend feature packages
       'db',       // Flyway migrations
       'config',   // application.yml, pom.xml settings
       'docker',   // docker-compose.yml

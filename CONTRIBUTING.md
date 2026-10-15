@@ -53,7 +53,7 @@ The format is [Conventional Commits](https://www.conventionalcommits.org), the c
 
 | Scope | Covers |
 |---|---|
-| `application`, `note`, `user`, `auth`, `stats`, `common` | The backend feature package of the same name |
+| `application`, `note`, `user`, `auth`, `stats`, `notification`, `common` | The backend feature package of the same name |
 | `db` | Flyway migrations |
 | `config` | `application.yml`, `pom.xml` settings |
 | `docker` | `docker-compose.yml` |

@@ -21,7 +21,7 @@ jobtrackr-backend/
     │   │   ├── auth/                         register, login, JWT, security configuration
     │   │   ├── stats/                        counts per status and response rate (GET /stats)
     │   │   ├── notification/                 follow-up reminders for the bell in the header (GET /notifications)
-    │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI, CORS
+    │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI, CORS, clock, scheduling
     │   └── resources/
     │       ├── application.yml               all configuration
     │       └── db/migration/                 Flyway SQL migrations (the only place schema changes)
@@ -90,16 +90,13 @@ Any exception thrown in the controller or below is converted to JSON by `common/
 
 ## 4. Data model
 
-Defined in `db/migration/V1__init.sql`. Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
+Defined in `db/migration/V1__init.sql` and later migrations (V5 refresh tokens, V6/V7 the notification column; V8 dropped the `resumes` and `match_results` tables that V1 had reserved for an AI resume match, which was taken out of scope). Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
 
 ```mermaid
 erDiagram
     users ||--o{ applications : owns
     applications ||--o{ notes : has
-    users ||--o{ resumes : uploads
-    users ||--o{ match_results : owns
-    resumes ||--o{ match_results : "used in"
-    applications |o--o{ match_results : "matched against"
+    users ||--o{ refresh_tokens : "signed in with"
 ```
 
 | Table | Java entity | Notes |
@@ -107,8 +104,7 @@ erDiagram
 | `users` | `user/User` | `email` unique, stored lower-case. `password_hash` is BCrypt |
 | `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter. `reminder_dismissed_on` (V6, renamed in V7) is internal to the notification feature and in no DTO |
 | `notes` | `note/Note` | No `user_id`; the owner is the owner of the parent application |
-| `resumes` | none yet | Reserved for the AI match feature |
-| `match_results` | none yet | Reserved for the AI match feature |
+| `refresh_tokens` | `auth/RefreshToken` | Added by V5. Hash only, never the token. Rows expired over 7 days ago are deleted nightly (section 8) |
 
 Deletion is handled by the database, not by JPA: deleting a user removes their applications, deleting an application removes its notes (`ON DELETE CASCADE`). That is why the entities have no `@OneToMany` collections and no JPA cascade settings.
 
@@ -127,6 +123,8 @@ This is the most important rule in the codebase.
 - Notes are checked through their parent: `findByIdAndApplicationUserId`.
 
 When adding a query, ask: "where is `user_id` in the WHERE clause?" If the answer is "nowhere", it is a bug.
+
+The one deliberate exception is `RefreshTokenRepository.deleteExpiredBefore`, called only by the nightly cleanup job: it has no logged-in user and an expired row is useless to everyone. It is never reachable from a controller.
 
 ## 6. Card ordering and the move algorithm
 
@@ -204,7 +202,8 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 - **`POST /api/v1/auth/logout`** revokes the refresh token and deletes the cookie. The access token still works until it expires (it is stateless), which is why it is kept short.
 - **CORS** allows credentials, which the cookie needs across ports (`localhost:4200` to `:8080`); that is only permitted because the allowed origins are an explicit list. `SameSite=Strict` works locally because ports do not make a different site; a frontend and API on different domains would need `SameSite=None; Secure` plus CSRF protection.
 - **Frontend:** a 401 from a protected endpoint triggers one shared refresh and a single retry of the original request; only if the refresh fails is the user logged out. After a reload with an expired access token, the route guards restore the session from the cookie. Details in [jobtrackr-frontend/README.md](../jobtrackr-frontend/README.md).
-- **Not done (known limitations):** expired and revoked rows are never deleted (a scheduled cleanup would do it), and there is no "log out everywhere" button, although the reuse detection already does exactly that internally.
+- **Cleanup:** `RefreshTokenCleanupJob` runs nightly (`jobtrackr.refresh-token-cleanup.cron`, default 03:30 India time) and deletes, in one bulk DELETE, rows that expired more than 7 days ago (`RefreshTokenService.EXPIRED_TOKEN_RETENTION`). Revoked rows that have not expired are kept: they are the evidence reuse detection needs, and the 7-day margin keeps that alarm working for a stolen copy replayed just after expiry. Scheduling can be switched off with `jobtrackr.scheduling.enabled=false` (tests do).
+- **Not done (known limitation):** there is no "log out everywhere" button, although the reuse detection already does exactly that internally.
 - Restarting with a different `JWT_SECRET` invalidates every token issued before.
 
 ## 9. Stats
@@ -274,6 +273,8 @@ All in `src/main/resources/application.yml`.
 | `spring.docker.compose.enabled` | `false` | Docker is started by hand |
 | `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required, at least 32 characters. Locally from `jobtrackr-backend/.env.properties` (git-ignored, pulled in by `spring.config.import`); a real environment variable overrides it |
 | `jobtrackr.jwt.access-token-ttl` | `15m` | Token lifetime |
+| `jobtrackr.scheduling.enabled` | `${SCHEDULING_ENABLED:true}` | Turns background jobs on (`common/config/SchedulingConfig`); `false` in tests |
+| `jobtrackr.refresh-token-cleanup.cron` / `.zone` | `0 30 3 * * *`, `Asia/Kolkata` | When the expired refresh-token cleanup runs (cron overridable with `REFRESH_TOKEN_CLEANUP_CRON`) |
 | `jobtrackr.cors.allowed-origins` | `${CORS_ALLOWED_ORIGINS:http://localhost:4200}` | Browser origins allowed to call the API |
 | `notifications.zone` | `${NOTIFICATIONS_ZONE:Asia/Kolkata}` | The zone in which "today" is decided for follow-up dates |
 | `notifications.upcoming-days` | `7` | How far ahead the bell lists upcoming follow-ups (0 to 30) |
@@ -285,7 +286,7 @@ The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main`
 | Kind | Examples | What they prove |
 |---|---|---|
 | Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest` | The service logic, especially the move arithmetic. Fast |
-| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
+| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `RefreshTokenCleanupIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
 
 Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` replaces `CurrentUserProvider` with a mock and skips the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters.
 

@@ -98,9 +98,10 @@ npm test           # unit tests (Vitest)
 - The JVM runs in UTC (set in `main` and in the surefire config). Windows reports the zone as `Asia/Calcutta`, which the `postgres:16` image rejects on connect.
 - A locally installed PostgreSQL service on port 5432 hides the Docker container and causes "password authentication failed". Stop the Windows service before starting the container.
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
+- Scheduled jobs (`RefreshTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.
 
 ## Not built yet
 
-Resumes and AI match (`resumes` and `match_results` tables exist but have no entities), deployment, cleanup of expired refresh-token rows. Follow-up reminders are in-app only (the header bell, `notification` package); there is deliberately no email or SMTP.
+Deployment. Out of scope by decision: AI resume match (its tables were dropped in V8) and email (follow-up reminders are in-app only: the header bell, `notification` package; there is deliberately no SMTP).

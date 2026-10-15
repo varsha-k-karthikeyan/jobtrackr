@@ -56,7 +56,7 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 
 A real `JWT_SECRET` environment variable, if set, takes priority over the file; that is how a deployed server would provide it. Keep the value stable: changing it logs out everyone who holds a token.
 
-Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example) at the repository root. Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
+Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example) at the repository root. Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`, `SCHEDULING_ENABLED`, `REFRESH_TOKEN_CLEANUP_CRON`) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
 
 #### Environment variables in an IntelliJ run configuration (Windows)
 
@@ -141,9 +141,9 @@ Then start the backend; Flyway rebuilds the database from the migrations.
 ## Status
 
 Built:
-- Backend: Kanban API (CRUD, move, notes), stats, follow-up notifications, validation and error handling, JWT authentication, CORS, a public demo account, tests.
+- Backend: Kanban API (CRUD, move, notes), stats, follow-up notifications, validation and error handling, JWT authentication with nightly cleanup of expired sessions, CORS, a public demo account, tests.
 - Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, follow-up bell in the header, tests.
 
 Sessions: a 15-minute access token plus a 14-day refresh token in an httpOnly cookie, rotated on every use, so you stay signed in while you keep using the app (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 8).
 
-Not built yet: resume upload and AI match, deployment. Follow-up reminders are in-app only (the bell); there is no email.
+Not built: deployment. Out of scope by decision: AI resume match, and email (follow-up reminders are in-app only, through the bell).

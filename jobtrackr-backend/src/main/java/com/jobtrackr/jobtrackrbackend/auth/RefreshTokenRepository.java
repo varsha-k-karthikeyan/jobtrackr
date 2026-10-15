@@ -22,6 +22,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("update RefreshToken t set t.revokedAt = :now where t.user.id = :userId and t.revokedAt is null")
     int revokeAllActiveForUser(@Param("userId") Long userId, @Param("now") Instant now);
 
+    // After a password change: every session of the user disappears. Deleted, not revoked: a revoked token that
+    // comes back later looks like theft and would revoke the fresh session too (see RefreshTokenService.rotate)
+    @Modifying
+    @Query("delete from RefreshToken t where t.user.id = :userId")
+    int deleteAllForUser(@Param("userId") Long userId);
+
     // Housekeeping for RefreshTokenCleanupJob: one bulk DELETE, no entities loaded.
     // The deliberate exception to "every query is scoped to the current user": a scheduled job has no
     // logged-in user, and an expired row is useless to every user. Never called from a controller.

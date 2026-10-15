@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -24,6 +25,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +40,8 @@ class AuthApiIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private MockMvc mockMvc;
     private String email;
@@ -222,6 +226,79 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void changePassword_returnsAFreshSession_endsTheOldOne_andTheNewPasswordLogsIn() throws Exception {
+        var registered = mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, PASSWORD)))
+                .andReturn().getResponse();
+        String oldCookie = refreshTokenIn(registered.getHeader(HttpHeaders.SET_COOKIE));
+        String accessToken = accessToken(registered.getContentAsString());
+
+        var changed = mockMvc.perform(put("/api/v1/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordChange(PASSWORD, "N3w@Secret")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
+                .andReturn().getResponse();
+        String newCookie = refreshTokenIn(changed.getHeader(HttpHeaders.SET_COOKIE));
+
+        // Every earlier session is over. Its row is deleted, not revoked: a revoked token replayed after the
+        // grace period would count as theft and end the fresh session too
+        assertThat(jdbc.queryForObject("select count(*) from refresh_tokens where token_hash = ?", Integer.class,
+                RefreshTokenService.hash(oldCookie))).isZero();
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, oldCookie)))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, newCookie)))
+                .andExpect(status().isOk());
+
+        login(email, "N3w@Secret");
+        mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, PASSWORD)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void changePassword_wrongCurrentPassword_is400OnThatField_not401() throws Exception {
+        String accessToken = register(email);
+
+        mockMvc.perform(put("/api/v1/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordChange("Wrong@Pass1", "N3w@Secret")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.currentPassword").value("Current password is incorrect"));
+    }
+
+    @Test
+    void changePassword_weakNewPassword_is400() throws Exception {
+        String accessToken = register(email);
+
+        mockMvc.perform(put("/api/v1/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordChange(PASSWORD, "weak")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.newPassword").exists());
+    }
+
+    @Test
+    void changePassword_demoAccount_is403() throws Exception {
+        String accessToken = login("demo@jobtrackr.dev", "Demo@1234");
+
+        mockMvc.perform(put("/api/v1/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordChange("Demo@1234", "N3w@Secret")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+        login("demo@jobtrackr.dev", "Demo@1234"); // unchanged
+    }
+
+    @Test
+    void changePassword_withoutToken_is401() throws Exception {
+        mockMvc.perform(put("/api/v1/me/password").contentType(MediaType.APPLICATION_JSON)
+                        .content(passwordChange(PASSWORD, "N3w@Secret")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void swaggerDocs_arePublic() throws Exception {
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
@@ -250,6 +327,10 @@ class AuthApiIntegrationTest {
 
     private static String accessToken(String responseBody) {
         return JsonPath.read(responseBody, "$.accessToken");
+    }
+
+    private static String passwordChange(String currentPassword, String newPassword) {
+        return "{\"currentPassword\": \"%s\", \"newPassword\": \"%s\"}".formatted(currentPassword, newPassword);
     }
 
     private static String credentials(String email, String password) {

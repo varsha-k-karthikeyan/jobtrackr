@@ -117,6 +117,14 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void endAllSessions_deletesTheRowsInsteadOfRevokingThem() {
+        when(repository.deleteAllForUser(7L)).thenReturn(2);
+
+        assertThat(service.endAllSessions(7L)).isEqualTo(2);
+        verify(repository, never()).revokeAllActiveForUser(anyLong(), any());
+    }
+
+    @Test
     void deleteExpiredTokens_deletesOnlyRowsExpiredMoreThanSevenDaysAgo() {
         when(repository.deleteExpiredBefore(any())).thenReturn(3);
 

@@ -91,6 +91,17 @@ public class RefreshTokenService {
         return refreshTokenRepository.deleteExpiredBefore(clock.instant().minus(EXPIRED_TOKEN_RETENTION));
     }
 
+    /**
+     * Ends every session of the user (after a password change) by deleting the rows rather than revoking them.
+     * Another device that later presents its old token then gets a plain 401 as an unknown token. A revoked
+     * token presented after the grace period would instead be taken as theft and revoke the new session too.
+     * Returns how many rows were deleted.
+     */
+    @Transactional
+    public int endAllSessions(Long userId) {
+        return refreshTokenRepository.deleteAllForUser(userId);
+    }
+
     /** Logout: the token stops working immediately. Unknown or already revoked tokens are ignored. */
     @Transactional
     public void revoke(String token) {

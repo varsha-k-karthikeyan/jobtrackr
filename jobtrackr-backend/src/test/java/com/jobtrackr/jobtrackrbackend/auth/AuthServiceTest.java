@@ -1,9 +1,14 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
 import com.jobtrackr.jobtrackrbackend.auth.dto.AuthResponse;
+import com.jobtrackr.jobtrackrbackend.auth.dto.ChangePasswordRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.LoginRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.RegisterRequest;
+import com.jobtrackr.jobtrackrbackend.common.CurrentUserProvider;
 import com.jobtrackr.jobtrackrbackend.common.exception.ConflictException;
+import com.jobtrackr.jobtrackrbackend.common.exception.FieldValidationException;
+import com.jobtrackr.jobtrackrbackend.common.exception.ForbiddenException;
+import com.jobtrackr.jobtrackrbackend.user.DemoAccount;
 import com.jobtrackr.jobtrackrbackend.user.User;
 import com.jobtrackr.jobtrackrbackend.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +43,8 @@ class AuthServiceTest {
     private TokenService tokenService;
     @Mock
     private RefreshTokenService refreshTokenService;
+    @Mock
+    private CurrentUserProvider currentUser;
 
     // Real BCrypt at the lowest cost factor: fast, but still proves hashing and matching work
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
@@ -46,7 +53,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(userRepository, passwordEncoder, tokenService, refreshTokenService);
+        service = new AuthService(userRepository, passwordEncoder, tokenService, refreshTokenService, currentUser);
     }
 
     @Test
@@ -129,5 +136,63 @@ class AuthServiceTest {
 
         service.logout(null);
         verify(refreshTokenService, never()).revoke(null);
+    }
+
+    // ---------- change password ----------
+
+    private User signedInUser(String email, String password) {
+        User user = new User(email, passwordEncoder.encode(password), "Varsha");
+        user.setId(7L);
+        when(currentUser.getUserId()).thenReturn(7L);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        return user;
+    }
+
+    @Test
+    void changePassword_storesTheNewHash_endsEverySession_andStartsAFreshOne() {
+        User user = signedInUser("varsha@example.com", "Old@Pass1");
+        when(tokenService.issueAccessToken(user)).thenReturn(ACCESS);
+        when(refreshTokenService.issue(user)).thenReturn(REFRESH);
+
+        AuthTokens tokens = service.changePassword(new ChangePasswordRequest("Old@Pass1", "New@Pass2"));
+
+        assertThat(passwordEncoder.matches("New@Pass2", user.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches("Old@Pass1", user.getPasswordHash())).isFalse();
+        verify(refreshTokenService).endAllSessions(7L);
+        assertThat(tokens).isEqualTo(new AuthTokens(ACCESS, REFRESH));
+    }
+
+    @Test
+    void changePassword_wrongCurrentPassword_isAFieldErrorAndChangesNothing() {
+        User user = signedInUser("varsha@example.com", "Old@Pass1");
+        String hashBefore = user.getPasswordHash();
+
+        assertThatThrownBy(() -> service.changePassword(new ChangePasswordRequest("Wrong@Pass1", "New@Pass2")))
+                .isInstanceOf(FieldValidationException.class)
+                .hasMessage("Current password is incorrect")
+                .extracting("field").isEqualTo("currentPassword");
+        assertThat(user.getPasswordHash()).isEqualTo(hashBefore);
+        verifyNoInteractions(refreshTokenService, tokenService);
+    }
+
+    @Test
+    void changePassword_sameAsCurrent_isAFieldErrorOnTheNewPassword() {
+        signedInUser("varsha@example.com", "Old@Pass1");
+
+        assertThatThrownBy(() -> service.changePassword(new ChangePasswordRequest("Old@Pass1", "Old@Pass1")))
+                .isInstanceOf(FieldValidationException.class)
+                .extracting("field").isEqualTo("newPassword");
+        verifyNoInteractions(refreshTokenService);
+    }
+
+    @Test
+    void changePassword_demoAccount_isForbidden() {
+        User demo = signedInUser(DemoAccount.EMAIL, "Demo@1234");
+        String hashBefore = demo.getPasswordHash();
+
+        assertThatThrownBy(() -> service.changePassword(new ChangePasswordRequest("Demo@1234", "New@Pass2")))
+                .isInstanceOf(ForbiddenException.class);
+        assertThat(demo.getPasswordHash()).isEqualTo(hashBefore);
+        verifyNoInteractions(refreshTokenService);
     }
 }

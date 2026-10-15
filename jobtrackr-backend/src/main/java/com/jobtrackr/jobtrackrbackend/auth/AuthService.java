@@ -1,8 +1,14 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
+import com.jobtrackr.jobtrackrbackend.auth.dto.ChangePasswordRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.LoginRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.RegisterRequest;
+import com.jobtrackr.jobtrackrbackend.common.CurrentUserProvider;
 import com.jobtrackr.jobtrackrbackend.common.exception.ConflictException;
+import com.jobtrackr.jobtrackrbackend.common.exception.FieldValidationException;
+import com.jobtrackr.jobtrackrbackend.common.exception.ForbiddenException;
+import com.jobtrackr.jobtrackrbackend.common.exception.NotFoundException;
+import com.jobtrackr.jobtrackrbackend.user.DemoAccount;
 import com.jobtrackr.jobtrackrbackend.user.User;
 import com.jobtrackr.jobtrackrbackend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
 
-// Registration, login, refresh and logout. Knows nothing about HTTP: it returns tokens, and the controller
+// Registration, login, refresh, logout and password change. Knows nothing about HTTP: it returns tokens, and the controller
 // decides that the access token goes in the body and the refresh token in a cookie.
 @Service
 @RequiredArgsConstructor
@@ -23,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final RefreshTokenService refreshTokenService;
+    private final CurrentUserProvider currentUser;
 
     @Transactional
     public AuthTokens register(RegisterRequest request) {
@@ -65,6 +72,31 @@ public class AuthService {
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokenService.revoke(refreshToken);
         }
+    }
+
+    /**
+     * Changes the signed-in user's password, ends every other session and starts a fresh one for this browser.
+     * The two password errors are 400 field errors, deliberately not 401: the frontend treats any 401 as an
+     * expired session and would try a token refresh instead of showing "incorrect" under the field.
+     */
+    @Transactional
+    public AuthTokens changePassword(ChangePasswordRequest request) {
+        User user = userRepository.findById(currentUser.getUserId())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+        if (DemoAccount.isDemo(user)) {
+            throw new ForbiddenException("The demo account's password can't be changed. Register your own account to try this.");
+        }
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new FieldValidationException("currentPassword", "Current password is incorrect");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new FieldValidationException("newPassword", "must be different from your current password");
+        }
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        // Anyone else signed in as this user (another device, or whoever learned the old password) is logged
+        // out at their next refresh. Their access token still works until it expires, at most 15 minutes.
+        refreshTokenService.endAllSessions(user.getId());
+        return startSession(user);
     }
 
     private AuthTokens startSession(User user) {

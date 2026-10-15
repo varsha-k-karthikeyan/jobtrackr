@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,7 +12,8 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { problemFieldErrors, problemMessage } from '../../../core/api/problem-message';
 import { AuthService } from '../../../core/auth/auth-service';
-import { PASSWORD_RULES, passwordStrengthValidator } from '../../../shared/validators/password-strength';
+import { PasswordRules } from '../../../shared/components/password-rules/password-rules';
+import { passwordStrengthValidator } from '../../../shared/validators/password-strength';
 
 @Component({
   selector: 'app-register-page',
@@ -25,9 +26,9 @@ import { PASSWORD_RULES, passwordStrengthValidator } from '../../../shared/valid
     MatIconModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    PasswordRules,
   ],
   templateUrl: './register-page.html',
-  styleUrl: './register-page.scss',
 })
 export class RegisterPage {
   private readonly auth = inject(AuthService);
@@ -43,10 +44,7 @@ export class RegisterPage {
   });
 
   // Live checklist under the password field: re-evaluated on every keystroke
-  private readonly passwordValue = toSignal(this.form.controls.password.valueChanges, { initialValue: '' });
-  protected readonly passwordRules = computed(() =>
-    PASSWORD_RULES.map((rule) => ({ label: rule.label, met: rule.isMet(this.passwordValue()) })),
-  );
+  protected readonly passwordValue = toSignal(this.form.controls.password.valueChanges, { initialValue: '' });
   protected readonly submitting = signal(false);
   protected readonly serverError = signal<string | null>(null);
   protected readonly emailTaken = signal(false);

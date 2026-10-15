@@ -85,6 +85,11 @@
         </div>
         <mat-divider />
       }
+      <!-- The demo account is shared, so its password is fixed (the backend refuses with 403 as well) -->
+      <button mat-menu-item (click)="changePassword()" [disabled]="isDemoAccount()">
+        <mat-icon>lock_reset</mat-icon>
+        <span>{{ isDemoAccount() ? 'Change password (not for the demo)' : 'Change password' }}</span>
+      </button>
       <button mat-menu-item (click)="logout()">
         <mat-icon>logout</mat-icon>
         <span>Log out</span>

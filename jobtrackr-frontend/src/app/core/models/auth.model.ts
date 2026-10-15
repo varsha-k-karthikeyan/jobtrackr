@@ -19,6 +19,12 @@ export interface RegisterRequest {
   fullName: string | null;
 }
 
+/** PUT /me/password. Answered with a fresh AuthResponse (and a new refresh cookie). */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 /** GET /me (UserResponse). */
 export interface User {
   id: number;

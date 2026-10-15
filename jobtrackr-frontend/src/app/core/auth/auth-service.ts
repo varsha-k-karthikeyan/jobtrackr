@@ -3,7 +3,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, finalize, firstValueFrom, map, Observable, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginRequest, RegisterRequest, User } from '../models/auth.model';
+import { AuthResponse, ChangePasswordRequest, LoginRequest, RegisterRequest, User } from '../models/auth.model';
 import { SKIP_ERROR_TOAST } from '../interceptors/error-interceptor';
 import { clearStoredToken, hasSessionHint, readStoredToken, storeToken, TOKEN_KEY } from './token-storage';
 
@@ -54,6 +54,22 @@ export class AuthService {
     return this.http
       .post<AuthResponse>(`${this.authUrl}/register`, request, { context: skipToast(), withCredentials: true })
       .pipe(switchMap((response) => this.startSession(response)));
+  }
+
+  /**
+   * Changes the password. The backend ends every session and answers with a fresh access token plus a new
+   * refresh cookie for this browser; withCredentials is required for the browser to store that cookie.
+   * Errors (wrong current password, demo account) are left to the dialog.
+   */
+  changePassword(request: ChangePasswordRequest): Observable<void> {
+    return this.http
+      .put<AuthResponse>(`${environment.apiBaseUrl}/me/password`, request, { context: skipToast(), withCredentials: true })
+      .pipe(
+        map((response) => {
+          storeToken(response.accessToken);
+          this.tokenState.set(response.accessToken);
+        }),
+      );
   }
 
   loadMe(context?: HttpContext): Observable<User> {

@@ -10,6 +10,8 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
 import { AuthService } from '../../auth/auth-service';
+import { DEMO_CREDENTIALS } from '../../auth/demo-credentials';
+import { Notifier } from '../../notifications/notifier';
 import { followUpLabel, NotificationStore } from '../../notifications/notification-store';
 import { ApplicationStore } from '../../state/application-store';
 
@@ -37,6 +39,7 @@ export class Shell {
   private readonly applications = inject(ApplicationStore);
   private readonly notifications = inject(NotificationStore);
   private readonly dialog = inject(MatDialog);
+  private readonly notifier = inject(Notifier);
 
   protected readonly user = this.auth.user;
   // Null until /me answers; the menu shows a neutral label meanwhile
@@ -77,6 +80,22 @@ export class Shell {
 
   protected dismissAll(): void {
     this.notifications.dismissAll().catch(() => undefined);
+  }
+
+  protected readonly isDemoAccount = computed(() => this.user()?.email === DEMO_CREDENTIALS.email);
+
+  protected changePassword(): void {
+    // Loaded on first use: most sessions never open this dialog
+    void import('../../../shared/components/change-password-dialog/change-password-dialog').then(
+      ({ openChangePasswordDialog }) =>
+        openChangePasswordDialog(this.dialog)
+          .afterClosed()
+          .subscribe((changed) => {
+            if (changed) {
+              this.notifier.show('Password changed. Other devices have been signed out.');
+            }
+          }),
+    );
   }
 
   protected logout(): void {

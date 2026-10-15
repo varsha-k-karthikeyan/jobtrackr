@@ -74,15 +74,7 @@
               }
             </mat-form-field>
 
-            <ul class="password-rules m-0 grid list-none gap-1 p-0 text-xs sm:grid-cols-2" aria-label="Password rules">
-              @for (rule of passwordRules(); track rule.label) {
-                <li class="flex items-center gap-1.5" [class.met]="rule.met">
-                  <mat-icon class="rule-icon" aria-hidden="true">{{ rule.met ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-                  <span>{{ rule.label }}</span>
-                  <span class="sr-only">{{ rule.met ? '(met)' : '(not met)' }}</span>
-                </li>
-              }
-            </ul>
+            <app-password-rules [password]="passwordValue()" />
 
             <button mat-flat-button type="submit" class="mt-2" [disabled]="submitting()">
               <span class="inline-flex items-center gap-2">

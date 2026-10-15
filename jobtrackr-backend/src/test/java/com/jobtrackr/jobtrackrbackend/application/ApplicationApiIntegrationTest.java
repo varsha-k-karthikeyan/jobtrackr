@@ -107,6 +107,78 @@ class ApplicationApiIntegrationTest {
     }
 
     @Test
+    void list_searchCoversLocationSourceAndStatus() throws Exception {
+        createJson("""
+                {"company": "Acme", "role": "Engineer", "status": "APPLIED", "location": "Chennai", "source": "Referral"}
+                """);
+        createJson("""
+                {"company": "Globex", "role": "Engineer", "status": "OFFER", "location": "Pune", "source": "LinkedIn"}
+                """);
+
+        mockMvc.perform(get(BASE).param("searchText", "chenn"))
+                .andExpect(jsonPath("$.content[*].company", contains("Acme")));
+        mockMvc.perform(get(BASE).param("searchText", "LINKED"))
+                .andExpect(jsonPath("$.content[*].company", contains("Globex")));
+        // "off" matches no text field, but it is part of the status OFFER
+        mockMvc.perform(get(BASE).param("searchText", "off"))
+                .andExpect(jsonPath("$.content[*].company", contains("Globex")));
+    }
+
+    @Test
+    void list_sortsBySalaryAndLocation_withEmptyValuesLast() throws Exception {
+        createJson("""
+                {"company": "Low", "role": "R", "status": "APPLIED", "salaryMinLpa": 10, "salaryMaxLpa": 15, "location": "Pune"}
+                """);
+        createJson("""
+                {"company": "None", "role": "R", "status": "APPLIED"}
+                """);
+        createJson("""
+                {"company": "High", "role": "R", "status": "APPLIED", "salaryMinLpa": 30, "salaryMaxLpa": 40, "location": "Bengaluru"}
+                """);
+
+        mockMvc.perform(get(BASE).param("sort", "salaryMaxLpa,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].company", contains("High", "Low", "None")));
+        mockMvc.perform(get(BASE).param("sort", "salaryMinLpa,asc"))
+                .andExpect(jsonPath("$.content[*].company", contains("Low", "High", "None")));
+        mockMvc.perform(get(BASE).param("sort", "location,asc"))
+                .andExpect(jsonPath("$.content[*].company", contains("High", "Low", "None")));
+    }
+
+    @Test
+    void list_salaryRangeKeepsOverlappingJobs() throws Exception {
+        createJson("""
+                {"company": "Low", "role": "R", "status": "APPLIED", "salaryMinLpa": 10, "salaryMaxLpa": 15}
+                """);
+        createJson("""
+                {"company": "Mid", "role": "R", "status": "APPLIED", "salaryMinLpa": 25, "salaryMaxLpa": 35}
+                """);
+        createJson("""
+                {"company": "High", "role": "R", "status": "APPLIED", "salaryMinLpa": 40, "salaryMaxLpa": 50}
+                """);
+        createJson("""
+                {"company": "MinOnly", "role": "R", "status": "APPLIED", "salaryMinLpa": 22}
+                """);
+        createJson("""
+                {"company": "NoSalary", "role": "R", "status": "APPLIED"}
+                """);
+
+        // 20-30 overlaps Mid (25-35) and MinOnly (22); Low ends below, High starts above, NoSalary has nothing
+        mockMvc.perform(get(BASE).param("salaryFrom", "20").param("salaryTo", "30").param("sort", "company,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].company", contains("Mid", "MinOnly")));
+        // Only a lower bound: everything paying at least 36 at the top of its range
+        mockMvc.perform(get(BASE).param("salaryFrom", "36").param("sort", "company,asc"))
+                .andExpect(jsonPath("$.content[*].company", contains("High")));
+        // No salary filter: all five, including the job without a salary
+        mockMvc.perform(get(BASE))
+                .andExpect(jsonPath("$.totalElements").value(5));
+        // Invalid range
+        mockMvc.perform(get(BASE).param("salaryFrom", "30").param("salaryTo", "20"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void get_unknownId_returns404ProblemDetail() throws Exception {
         mockMvc.perform(get(BASE + "/{id}", Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
@@ -129,6 +201,30 @@ class ApplicationApiIntegrationTest {
         mockMvc.perform(put(BASE + "/{id}", id).contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void update_withNewStatus_putsCardAtBottomOfThatColumn() throws Exception {
+        create("A", "APPLIED");
+        long b = create("B", "APPLIED");
+        create("C", "APPLIED");
+        create("X", "INTERVIEW");
+
+        mockMvc.perform(put(BASE + "/{id}", b).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"company": "B", "role": "Engineer", "status": "INTERVIEW", "version": 0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INTERVIEW"))
+                .andExpect(jsonPath("$.position").value(1))
+                .andExpect(jsonPath("$.version").value(1));
+        sync();
+
+        mockMvc.perform(get(BASE + "/board"))
+                .andExpect(jsonPath("$.APPLIED[*].company", contains("A", "C")))
+                .andExpect(jsonPath("$.APPLIED[*].position", contains(0, 1)))
+                .andExpect(jsonPath("$.INTERVIEW[*].company", contains("X", "B")))
+                .andExpect(jsonPath("$.INTERVIEW[*].position", contains(0, 1)));
     }
 
     @Test
@@ -206,6 +302,24 @@ class ApplicationApiIntegrationTest {
     }
 
     @Test
+    void stats_countsCardsPerStatusForCurrentUserOnly() throws Exception {
+        create("A", "APPLIED");
+        create("B", "APPLIED");
+        create("C", "INTERVIEW");
+        create("D", "REJECTED");
+
+        // The grouped JPQL query runs for real here; the unit test only covers the arithmetic
+        mockMvc.perform(get("/api/v1/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.applied").value(2))
+                .andExpect(jsonPath("$.interview").value(1))
+                .andExpect(jsonPath("$.offer").value(0))
+                .andExpect(jsonPath("$.rejected").value(1))
+                .andExpect(jsonPath("$.responseRate").value(0.5));
+    }
+
+    @Test
     void openApiDocs_areServed() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -220,6 +334,11 @@ class ApplicationApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(response, "$.id")).longValue();
+    }
+
+    private void createJson(String json) throws Exception {
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isCreated());
     }
 
     private void move(long id, String status, int position) throws Exception {

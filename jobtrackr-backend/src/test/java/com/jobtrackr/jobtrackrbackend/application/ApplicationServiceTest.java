@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.application;
 
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationDetailResponse;
+import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationListFilter;
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationResponse;
 import com.jobtrackr.jobtrackrbackend.application.dto.CreateApplicationRequest;
 import com.jobtrackr.jobtrackrbackend.application.dto.MoveApplicationRequest;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -92,7 +94,7 @@ class ApplicationServiceTest {
         when(applicationRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(card(1L, APPLIED, 0)), pageable, 11));
 
-        PageResponse<ApplicationResponse> page = service.list(APPLIED, "acme", pageable);
+        PageResponse<ApplicationResponse> page = service.list(new ApplicationListFilter(APPLIED, "acme", null, null), pageable);
 
         assertThat(page.content()).extracting(ApplicationResponse::id).containsExactly(1L);
         assertThat(page.totalElements()).isEqualTo(11);
@@ -103,10 +105,29 @@ class ApplicationServiceTest {
     void list_rejectsUnknownSortField() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by("user.passwordHash"));
 
-        assertThatThrownBy(() -> service.list(null, null, pageable))
+        assertThatThrownBy(() -> service.list(noFilter(), pageable))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Cannot sort by");
         verifyNoMoreInteractions(applicationRepository);
+    }
+
+    @Test
+    void list_rejectsSalaryFromGreaterThanSalaryTo() {
+        ApplicationListFilter filter = new ApplicationListFilter(null, null, new BigDecimal("30"), new BigDecimal("20"));
+
+        assertThatThrownBy(() -> service.list(filter, PageRequest.of(0, 10)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("salaryFrom can't be greater than salaryTo");
+        verifyNoMoreInteractions(applicationRepository);
+    }
+
+    @Test
+    void list_rejectsNegativeSalaryBound() {
+        ApplicationListFilter filter = new ApplicationListFilter(null, null, new BigDecimal("-1"), null);
+
+        assertThatThrownBy(() -> service.list(filter, PageRequest.of(0, 10)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("can't be negative");
     }
 
     @Test
@@ -172,6 +193,53 @@ class ApplicationServiceTest {
 
         assertThat(card.getCompany()).isEqualTo("Company 5");
         verify(applicationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void update_withNewStatus_movesCardToBottomOfTargetColumnAndClosesTheGap() {
+        Application card = givenCard(5L, APPLIED, 1);
+        when(applicationRepository.countByUserIdAndStatus(USER_ID, INTERVIEW)).thenReturn(3L);
+
+        ApplicationResponse response = service.update(5L, updateRequest("Acme", "Engineer", INTERVIEW, 0));
+
+        verify(applicationRepository).shiftPositions(USER_ID, APPLIED, 2, END, -1);
+        assertThat(card.getStatus()).isEqualTo(INTERVIEW);
+        assertThat(card.getPosition()).isEqualTo(3);
+        assertThat(response.status()).isEqualTo(INTERVIEW);
+        assertThat(response.company()).isEqualTo("Acme");
+        verify(applicationRepository).saveAndFlush(card);
+    }
+
+    @Test
+    void update_withSameStatus_leavesPositionsAlone() {
+        Application card = givenCard(5L, APPLIED, 1);
+
+        service.update(5L, updateRequest("Acme", "Engineer", APPLIED, 0));
+
+        verify(applicationRepository, never()).shiftPositions(any(), any(), anyInt(), anyInt(), anyInt());
+        assertThat(card.getPosition()).isEqualTo(1);
+    }
+
+    @Test
+    void update_withoutStatus_keepsTheCurrentColumn() {
+        Application card = givenCard(5L, OFFER, 0);
+
+        service.update(5L, updateRequest("Acme", "Engineer", null, 0));
+
+        verify(applicationRepository, never()).shiftPositions(any(), any(), anyInt(), anyInt(), anyInt());
+        assertThat(card.getStatus()).isEqualTo(OFFER);
+    }
+
+    @Test
+    void update_withStaleVersion_doesNotMoveTheCard() {
+        Application card = givenCard(5L, APPLIED, 1);
+        card.setVersion(3);
+
+        assertThatThrownBy(() -> service.update(5L, updateRequest("Acme", "Engineer", REJECTED, 2)))
+                .isInstanceOf(OptimisticLockingFailureException.class);
+
+        verify(applicationRepository, never()).shiftPositions(any(), any(), anyInt(), anyInt(), anyInt());
+        assertThat(card.getStatus()).isEqualTo(APPLIED);
     }
 
     @Test
@@ -293,6 +361,10 @@ class ApplicationServiceTest {
 
     // ---------- helpers ----------
 
+    private static ApplicationListFilter noFilter() {
+        return new ApplicationListFilter(null, null, null, null);
+    }
+
     private Application givenCard(Long id, ApplicationStatus status, int position) {
         Application card = card(id, status, position);
         when(applicationRepository.findByIdAndUserId(id, USER_ID)).thenReturn(Optional.of(card));
@@ -311,6 +383,10 @@ class ApplicationServiceTest {
     }
 
     private static UpdateApplicationRequest updateRequest(String company, String role, int version) {
-        return new UpdateApplicationRequest(company, role, null, null, null, null, null, null, null, null, version);
+        return updateRequest(company, role, null, version);
+    }
+
+    private static UpdateApplicationRequest updateRequest(String company, String role, ApplicationStatus status, int version) {
+        return new UpdateApplicationRequest(company, role, status, null, null, null, null, null, null, null, null, version);
     }
 }

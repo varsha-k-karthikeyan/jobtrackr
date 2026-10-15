@@ -34,6 +34,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                // Uses the CorsConfigurationSource bean from common/config/CorsConfig. Runs before authorization,
+                // so a browser's preflight OPTIONS request (which carries no token) is answered, not rejected.
+                .cors(Customizer.withDefaults())
                 // No cookies or sessions are used, so there is nothing for CSRF to exploit
                 .csrf(AbstractHttpConfigurer::disable)
                 // Stateless: every request must prove itself with its own token

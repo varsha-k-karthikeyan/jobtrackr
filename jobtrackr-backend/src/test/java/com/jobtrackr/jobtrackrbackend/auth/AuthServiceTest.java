@@ -52,13 +52,13 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tokenService.issueAccessToken(any(User.class))).thenReturn(TOKEN);
 
-        AuthResponse response = service.register(new RegisterRequest(" Varsha@Example.com ", "s3cretPass", "Varsha"));
+        AuthResponse response = service.register(new RegisterRequest(" Varsha@Example.com ", "S3cret@Pass", "Varsha"));
 
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(saved.capture());
         assertThat(saved.getValue().getEmail()).isEqualTo("varsha@example.com");
-        assertThat(saved.getValue().getPasswordHash()).isNotEqualTo("s3cretPass").startsWith("$2");
-        assertThat(passwordEncoder.matches("s3cretPass", saved.getValue().getPasswordHash())).isTrue();
+        assertThat(saved.getValue().getPasswordHash()).isNotEqualTo("S3cret@Pass").startsWith("$2");
+        assertThat(passwordEncoder.matches("S3cret@Pass", saved.getValue().getPasswordHash())).isTrue();
         assertThat(response).isEqualTo(TOKEN);
     }
 
@@ -66,7 +66,7 @@ class AuthServiceTest {
     void register_existingEmail_throwsConflictAndSavesNothing() {
         when(userRepository.existsByEmail("varsha@example.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.register(new RegisterRequest("varsha@example.com", "s3cretPass", null)))
+        assertThatThrownBy(() -> service.register(new RegisterRequest("varsha@example.com", "S3cret@Pass", null)))
                 .isInstanceOf(ConflictException.class);
         verify(userRepository, never()).save(any());
         verifyNoInteractions(tokenService);
@@ -74,16 +74,16 @@ class AuthServiceTest {
 
     @Test
     void login_correctPassword_returnsToken() {
-        User user = new User("varsha@example.com", passwordEncoder.encode("s3cretPass"), "Varsha");
+        User user = new User("varsha@example.com", passwordEncoder.encode("S3cret@Pass"), "Varsha");
         when(userRepository.findByEmail("varsha@example.com")).thenReturn(Optional.of(user));
         when(tokenService.issueAccessToken(user)).thenReturn(TOKEN);
 
-        assertThat(service.login(new LoginRequest("VARSHA@example.com", "s3cretPass"))).isEqualTo(TOKEN);
+        assertThat(service.login(new LoginRequest("VARSHA@example.com", "S3cret@Pass"))).isEqualTo(TOKEN);
     }
 
     @Test
     void login_wrongPassword_throwsBadCredentials() {
-        User user = new User("varsha@example.com", passwordEncoder.encode("s3cretPass"), "Varsha");
+        User user = new User("varsha@example.com", passwordEncoder.encode("S3cret@Pass"), "Varsha");
         when(userRepository.findByEmail("varsha@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.login(new LoginRequest("varsha@example.com", "wrong-password")))
@@ -95,7 +95,7 @@ class AuthServiceTest {
     void login_unknownEmail_throwsTheSameBadCredentials() {
         when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", "s3cretPass")))
+        assertThatThrownBy(() -> service.login(new LoginRequest("nobody@example.com", "S3cret@Pass")))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessage("Invalid email or password");
     }

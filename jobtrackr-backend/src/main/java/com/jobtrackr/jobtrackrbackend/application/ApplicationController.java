@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.application;
 
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationDetailResponse;
+import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationListFilter;
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationResponse;
 import com.jobtrackr.jobtrackrbackend.application.dto.CreateApplicationRequest;
 import com.jobtrackr.jobtrackrbackend.application.dto.MoveApplicationRequest;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -44,14 +44,15 @@ public class ApplicationController {
         return applicationService.getBoard();
     }
 
-    // e.g. /applications?status=APPLIED&searchText=google&sort=appliedOn,desc&page=0&size=10
+    // e.g. /applications?status=APPLIED&searchText=google&salaryFrom=20&salaryTo=30&sort=appliedOn,desc&page=0&size=10
+    // The filter parameters are bound into the ApplicationListFilter record by its constructor;
+    // @ParameterObject makes Swagger show each record field as a separate query parameter.
     @GetMapping
     public PageResponse<ApplicationResponse> list(
-            @RequestParam(required = false) ApplicationStatus status,
-            @RequestParam(required = false) String searchText,
+            @ParameterObject ApplicationListFilter filter,
             @ParameterObject
             @PageableDefault(size = 10, sort = "appliedOn", direction = Sort.Direction.DESC) Pageable pageable) {
-        return applicationService.list(status, searchText, pageable);
+        return applicationService.list(filter, pageable);
     }
 
     @PostMapping

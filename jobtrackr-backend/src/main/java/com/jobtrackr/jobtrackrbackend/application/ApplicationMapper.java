@@ -50,7 +50,8 @@ public class ApplicationMapper {
         return application;
     }
 
-    // Copies editable fields only; id, owner, status, position and version are left alone
+    // Copies the plain fields only. Status and position need column bookkeeping, so ApplicationService
+    // handles them; id, owner and version are never copied from a request.
     public void applyUpdate(Application application, UpdateApplicationRequest request) {
         application.setCompany(request.company());
         application.setRole(request.role());

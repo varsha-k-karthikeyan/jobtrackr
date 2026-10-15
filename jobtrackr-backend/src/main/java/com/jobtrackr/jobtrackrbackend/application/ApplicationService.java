@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.application;
 
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationDetailResponse;
+import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationListFilter;
 import com.jobtrackr.jobtrackrbackend.application.dto.ApplicationResponse;
 import com.jobtrackr.jobtrackrbackend.application.dto.CreateApplicationRequest;
 import com.jobtrackr.jobtrackrbackend.application.dto.MoveApplicationRequest;
@@ -13,6 +14,7 @@ import com.jobtrackr.jobtrackrbackend.note.NoteRepository;
 import com.jobtrackr.jobtrackrbackend.note.dto.NoteResponse;
 import com.jobtrackr.jobtrackrbackend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -36,7 +39,8 @@ public class ApplicationService {
 
     // Whitelist for ?sort=, so clients cannot sort by internal paths such as user.passwordHash
     private static final Set<String> SORTABLE_FIELDS = Set.of(
-            "appliedOn", "followUpOn", "company", "role", "status", "position", "createdAt", "updatedAt");
+            "appliedOn", "followUpOn", "company", "role", "status", "location", "salaryMinLpa", "salaryMaxLpa",
+            "position", "createdAt", "updatedAt");
 
     private final ApplicationRepository applicationRepository;
     private final NoteRepository noteRepository;
@@ -56,15 +60,20 @@ public class ApplicationService {
         return board;
     }
 
-    public PageResponse<ApplicationResponse> list(ApplicationStatus status, String searchText, Pageable pageable) {
+    public PageResponse<ApplicationResponse> list(ApplicationListFilter filter, Pageable pageable) {
+        validateSalaryRange(filter);
         for (Sort.Order order : pageable.getSort()) {
             if (!SORTABLE_FIELDS.contains(order.getProperty())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Cannot sort by '" + order.getProperty() + "'. Allowed: " + SORTABLE_FIELDS.stream().sorted().toList());
             }
         }
+        // Empty values always go to the end, in either direction. PostgreSQL's default treats NULL as larger
+        // than any value, so "highest salary first" would otherwise start with every card that has no salary.
+        Sort nullsLast = Sort.by(pageable.getSort().stream().map(Sort.Order::nullsLast).toList());
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), nullsLast);
         return PageResponse.from(applicationRepository
-                .findAll(ApplicationSpecifications.filter(currentUser.getUserId(), status, searchText), pageable)
+                .findAll(ApplicationSpecifications.filter(currentUser.getUserId(), filter), sortedPageable)
                 .map(applicationMapper::toResponse));
     }
 
@@ -94,6 +103,11 @@ public class ApplicationService {
         // The stale value lives in the client, so compare the version the client sent explicitly.
         if (!request.version().equals(application.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Application.class, id);
+        }
+        // Changing the column from the edit form: the card goes to the bottom of the new column. Same
+        // transaction as the field changes, so a failure leaves neither the move nor the edit applied.
+        if (request.status() != null && request.status() != application.getStatus()) {
+            moveToBottomOfColumn(application, request.status());
         }
         applicationMapper.applyUpdate(application, request);
         // Flush now so the response carries the incremented version and new updatedAt
@@ -148,6 +162,30 @@ public class ApplicationService {
         card.setPosition(targetPosition);
         applicationRepository.saveAndFlush(card);
         return applicationMapper.toResponse(card);
+    }
+
+    // Query parameters are not a @Valid body, so the salary bounds are checked here: a 400 with a clear
+    // message instead of silently returning nothing.
+    private static void validateSalaryRange(ApplicationListFilter filter) {
+        BigDecimal from = filter.salaryFrom();
+        BigDecimal to = filter.salaryTo();
+        if ((from != null && from.signum() < 0) || (to != null && to.signum() < 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Salary bounds can't be negative");
+        }
+        if (from != null && to != null && from.compareTo(to) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "salaryFrom can't be greater than salaryTo");
+        }
+    }
+
+    // Takes a card out of its column (closing the gap) and appends it to another one. Only sets the new
+    // status/position on the entity; the caller's flush writes them, together with any other changes.
+    private void moveToBottomOfColumn(Application card, ApplicationStatus targetStatus) {
+        Long userId = currentUser.getUserId();
+        // Counted before the card changes column, so it is exactly the next free position at the bottom
+        int targetPosition = (int) applicationRepository.countByUserIdAndStatus(userId, targetStatus);
+        applicationRepository.shiftPositions(userId, card.getStatus(), card.getPosition() + 1, Integer.MAX_VALUE, -1);
+        card.setStatus(targetStatus);
+        card.setPosition(targetPosition);
     }
 
     // Every single-card operation goes through here, so the owner filter is always applied

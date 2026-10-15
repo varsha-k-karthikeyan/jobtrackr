@@ -1,5 +1,6 @@
 package com.jobtrackr.jobtrackrbackend.application.dto;
 
+import com.jobtrackr.jobtrackrbackend.application.ApplicationStatus;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -9,11 +10,14 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-// No status or position here: those only change through PATCH /applications/{id}/move,
-// which keeps the other cards' positions consistent.
+// Body of PUT /applications/{id}. Replaces every editable field.
+// status is optional: null keeps the current column. A different status moves the card to the BOTTOM of
+// that column (ApplicationService.update keeps positions gap-free). To place a card at a specific
+// position, use PATCH /applications/{id}/move instead. There is never a position field here.
 public record UpdateApplicationRequest(
         @NotBlank @Size(max = 150) String company,
         @NotBlank @Size(max = 150) String role,
+        ApplicationStatus status,
         String jdUrl,
         String jdText,
         @Size(max = 100) String location,

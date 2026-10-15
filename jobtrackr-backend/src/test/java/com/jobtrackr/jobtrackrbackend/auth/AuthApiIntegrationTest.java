@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
 import com.jayway.jsonpath.JsonPath;
+import com.jobtrackr.jobtrackrbackend.auth.dto.PasswordPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class AuthApiIntegrationTest {
 
-    private static final String PASSWORD = "s3cretPass";
+    private static final String PASSWORD = "S3cret@Pass";
 
     @Autowired
     private WebApplicationContext context;
@@ -65,6 +66,14 @@ class AuthApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.email").exists())
                 .andExpect(jsonPath("$.errors.password").exists());
+    }
+
+    @Test
+    void register_passwordWithoutUppercaseOrSpecialCharacter_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, "lowercase1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").value(PasswordPolicy.COMPOSITION_MESSAGE));
     }
 
     @Test
@@ -129,6 +138,17 @@ class AuthApiIntegrationTest {
         mockMvc.perform(get("/api/v1/applications").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void publicDemoAccount_canLogIn() throws Exception {
+        // Guards the hash written by V4__demo_user_data.sql: the README and the frontend publish these credentials
+        String token = login("demo@jobtrackr.dev", "Demo@1234");
+
+        mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.fullName").value("Demo User"));
     }
 
     @Test

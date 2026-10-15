@@ -35,6 +35,14 @@ spring:
     compose:
       enabled: false       # Docker is started manually with `docker compose up -d` from the monorepo root
 
+# In-app follow-up notifications (notification/NotificationProperties.java), validated at startup
+notifications:
+  # "Today" for follow-up dates is decided in this zone, not in the JVM's UTC: a follow-up date is a
+  # calendar date, and 01:00 in India is still yesterday in UTC.
+  zone: ${NOTIFICATIONS_ZONE:Asia/Kolkata}
+  # Follow-ups due within this many days after today are listed as "upcoming" (no badge count)
+  upcoming-days: 7
+
 # Application-specific settings, bound to auth/JwtProperties.java (validated at startup)
 jobtrackr:
   jwt:

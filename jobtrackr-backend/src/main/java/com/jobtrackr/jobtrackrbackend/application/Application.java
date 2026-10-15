@@ -82,6 +82,11 @@ public class Application {
     @Column(name = "follow_up_on")
     private LocalDate followUpOn;
 
+    // Day the user dismissed the follow-up notification for the current followUpOn (null = not dismissed).
+    // Internal bookkeeping for the notification feature: not part of any application request or response DTO.
+    @Column(name = "reminder_dismissed_on")
+    private LocalDate reminderDismissedOn;
+
     // Optimistic locking: Hibernate adds "WHERE version = ?" to every UPDATE and increments it
     @Version
     @Column(nullable = false)

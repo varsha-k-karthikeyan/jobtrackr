@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 // All business rules for applications: ownership, card ordering and optimistic locking.
@@ -108,6 +109,10 @@ public class ApplicationService {
         // transaction as the field changes, so a failure leaves neither the move nor the edit applied.
         if (request.status() != null && request.status() != application.getStatus()) {
             moveToBottomOfColumn(application, request.status());
+        }
+        // A new follow-up date deserves its own notification: forget that the old one was dismissed
+        if (!Objects.equals(application.getFollowUpOn(), request.followUpOn())) {
+            application.setReminderDismissedOn(null);
         }
         applicationMapper.applyUpdate(application, request);
         // Flush now so the response carries the incremented version and new updatedAt

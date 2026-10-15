@@ -28,6 +28,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -228,6 +229,31 @@ class ApplicationServiceTest {
 
         verify(applicationRepository, never()).shiftPositions(any(), any(), anyInt(), anyInt(), anyInt());
         assertThat(card.getStatus()).isEqualTo(OFFER);
+    }
+
+    @Test
+    void update_withNewFollowUpDate_bringsTheNotificationBack() {
+        Application card = givenCard(5L, APPLIED, 0);
+        card.setFollowUpOn(LocalDate.of(2026, 10, 10));
+        card.setReminderDismissedOn(LocalDate.of(2026, 10, 10));
+
+        service.update(5L, new UpdateApplicationRequest("Acme", "Engineer", null, null, null, null, null, null, null,
+                null, LocalDate.of(2026, 10, 20), 0));
+
+        assertThat(card.getReminderDismissedOn()).isNull();
+        assertThat(card.getFollowUpOn()).isEqualTo(LocalDate.of(2026, 10, 20));
+    }
+
+    @Test
+    void update_withSameFollowUpDate_keepsTheNotificationDismissed() {
+        Application card = givenCard(5L, APPLIED, 0);
+        card.setFollowUpOn(LocalDate.of(2026, 10, 10));
+        card.setReminderDismissedOn(LocalDate.of(2026, 10, 10));
+
+        service.update(5L, new UpdateApplicationRequest("Acme Corp", "Engineer", null, null, null, null, null, null, null,
+                null, LocalDate.of(2026, 10, 10), 0));
+
+        assertThat(card.getReminderDismissedOn()).isEqualTo(LocalDate.of(2026, 10, 10));
     }
 
     @Test

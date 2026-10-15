@@ -2,19 +2,25 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../auth/auth-service';
 
-/** Signed-in users only. Others go to /login, which sends them back here afterwards. */
-export const authGuard: CanActivateFn = (_route, state) => {
+/**
+ * Signed-in users only. With no valid access token (e.g. a reload after it expired) it first tries to
+ * renew the session silently from the refresh cookie; only then does it send the user to /login.
+ */
+export const authGuard: CanActivateFn = async (_route, state) => {
+  // inject() before any await: it only works synchronously, inside the injection context
   const auth = inject(AuthService);
-  if (auth.isAuthenticated()) {
+  const router = inject(Router);
+  if (await auth.tryRestoreSession()) {
     return true;
   }
-  return inject(Router).createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };
 
-/** /login and /register are pointless when already signed in. */
-export const guestGuard: CanActivateFn = () => {
+/** /login and /register are pointless when already signed in (or silently re-signable): go to the board. */
+export const guestGuard: CanActivateFn = async () => {
   const auth = inject(AuthService);
-  return auth.isAuthenticated() ? inject(Router).createUrlTree(['/board']) : true;
+  const router = inject(Router);
+  return (await auth.tryRestoreSession()) ? router.createUrlTree(['/board']) : true;
 };
 
 /**

@@ -12,8 +12,10 @@ export class Notifier {
   private readonly injector = inject(Injector);
 
   show(message: string, durationMs = 6000): void {
-    void import('@angular/material/snack-bar').then(({ MatSnackBar }) => {
-      this.injector.get(MatSnackBar).open(message, 'Dismiss', { duration: durationMs });
-    });
+    import('@angular/material/snack-bar')
+      .then(({ MatSnackBar }) => this.injector.get(MatSnackBar).open(message, 'Dismiss', { duration: durationMs }))
+      // The import is asynchronous: if the app (or a test) was torn down meanwhile, the injector is
+      // destroyed and there is nowhere left to show the message. Nothing to do in that case.
+      .catch(() => undefined);
   }
 }

@@ -75,16 +75,30 @@ Tailwind sits in cascade layers and Material does not, so Material always wins o
 
 ## Authentication
 
-- `core/auth/auth-service.ts` holds the session in signals (`token`, `user`, `isAuthenticated`). The token is kept in `localStorage` so a reload keeps you signed in; an expired token is discarded on startup.
-- `core/interceptors/auth-interceptor.ts` adds `Authorization: Bearer ...` to calls to our API only. A 401 from a protected endpoint clears the session, shows one "session expired" message and goes to `/login?returnUrl=...`.
-- `core/interceptors/error-interceptor.ts` shows any other failed request as a snackbar, using the server's ProblemDetail text. Requests whose caller shows the error itself (forms, the edit dialog's 409 handling, drag and drop) set `SKIP_ERROR_TOAST`, so nothing is shown twice.
-- `core/guards/auth-guards.ts`: `authGuard` protects `/board` and `/list`; `guestGuard` keeps signed-in users away from `/login` and `/register`.
+Two tokens:
 
-### Talking point: why localStorage and not an httpOnly cookie?
+| | Access token | Refresh token |
+|---|---|---|
+| What | Signed JWT | Random opaque value (the backend stores only its SHA-256) |
+| Lifetime | 15 minutes | 14 days, rotated on every use |
+| Where | `localStorage`, sent as `Authorization: Bearer` | httpOnly cookie `jobtrackr_refresh`, sent by the browser only to `/api/v1/auth/*` |
+| Readable by JavaScript | Yes | No |
 
-A token in `localStorage` can be read by any JavaScript on the page, so a cross-site scripting (XSS) bug could steal it. An httpOnly cookie cannot be read by JavaScript at all, which removes that risk, but the browser then sends it automatically, so the API needs CSRF protection and cross-origin cookie settings (`SameSite`, `Secure`, credentialed CORS).
+- `core/auth/auth-service.ts` holds the session in signals (`token`, `user`, `isAuthenticated`). `refreshAccessToken()` exchanges the cookie for a new access token; concurrent callers share **one** request. All `/auth/*` calls use `withCredentials: true`, which is what lets the browser store and send the cookie across origins (`:4200` to `:8080`).
+- `core/interceptors/auth-interceptor.ts` adds the Bearer token to calls to our API only. On a 401 from a protected endpoint it refreshes once and retries the original request once with the new token. If the token was already replaced by another request meanwhile, it just retries. Only when the refresh fails does it clear the session, show one "session expired" message and go to `/login?returnUrl=...`.
+- `core/guards/auth-guards.ts`: `authGuard` protects `/board` and `/list`; `guestGuard` keeps signed-in users away from `/login` and `/register`. Both are async: with no valid access token (a reload after it expired) they first try to restore the session from the cookie.
+- `core/auth/token-storage.ts` also keeps a "session hint" flag, so a silent refresh is only attempted when a cookie probably exists (JavaScript cannot check the cookie itself). Logout clears it.
+- **Logout** calls `POST /auth/logout` (revokes the refresh token, deletes the cookie) and clears local state without waiting for the network.
+- **Tabs** stay in step through the `storage` event; if two tabs refresh at the same moment, the loser adopts the token the winner saved.
+- `core/interceptors/error-interceptor.ts` shows any other failed request as a snackbar, using the server's ProblemDetail text. Requests whose caller shows the error itself (forms, the edit dialog's 409 handling, drag and drop, auth calls) set `SKIP_ERROR_TOAST`, so nothing is shown twice.
 
-For this app, `localStorage` is a reasonable trade-off: the token lives only 15 minutes, Angular escapes template output by default, and the app loads no third-party scripts. In a production system holding sensitive data, the stronger setup is a short-lived access token kept in memory plus a refresh token in an httpOnly, `SameSite=Strict` cookie.
+### Talking point: where do the tokens live, and why?
+
+A token in `localStorage` can be read by any JavaScript on the page, so a cross-site scripting (XSS) bug could steal it. An httpOnly cookie cannot be read by JavaScript at all.
+
+So the **long-lived refresh token is in an httpOnly cookie**. The worst an XSS bug could take is the access token, which expires within 15 minutes, never the 14-day session. The cookie is `SameSite=Strict` (not sent on requests started by other sites, which is the CSRF protection) and scoped to `/api/v1/auth`.
+
+The **access token stays in `localStorage`** so a reload does not need a refresh round trip. Keeping it only in memory would be stricter still; the trade-off is one extra `/auth/refresh` call on every page load.
 
 ## Configuration
 
@@ -98,7 +112,8 @@ For this app, `localStorage` is a reasonable trade-off: the token lives only 15 
 |---|---|
 | `core/state/application-store.spec.ts` | Load, optimistic move, rollback on failure, reload on 409, cleared on logout, stale responses dropped |
 | `core/state/board-state.spec.ts` | Pure move/insert/remove maths, clamping, immutability |
-| `core/auth/auth-service.spec.ts` | Token persistence, restore and expiry on startup, logout |
+| `core/auth/auth-service.spec.ts` | Token persistence, restore and expiry on startup, one shared refresh, silent restore from the cookie, logout |
+| `core/interceptors/auth-interceptor.spec.ts` | Bearer only to our API, refresh + single retry on 401, one refresh for simultaneous 401s, no refresh loop, logout when the refresh fails |
 | `shared/components/application-dialog/application-dialog.spec.ts` | Form validation (required, cross-field salary, limits), edit prefill, the exact request body |
 
 HTTP is tested with `HttpTestingController`; no real request leaves a test.

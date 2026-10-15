@@ -1,0 +1,190 @@
+<section class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-baseline gap-3">
+      <h1 class="m-0 text-2xl font-semibold">List</h1>
+      <span class="text-sm opacity-70">{{ totalElements() }} {{ totalElements() === 1 ? 'result' : 'results' }}</span>
+    </div>
+    <button mat-flat-button type="button" (click)="addApplication()">
+      <mat-icon>add</mat-icon>
+      Add application
+    </button>
+  </div>
+
+  <!-- Filters -->
+  <!-- gap-y-4: when the filters wrap onto two lines (phones), the Status label needs room above it -->
+  <div class="flex flex-wrap items-start gap-x-4 gap-y-4">
+    <mat-form-field appearance="outline" class="min-w-0 flex-1 basis-64" subscriptSizing="dynamic">
+      <mat-label>Search company, role, location, source or status</mat-label>
+      <mat-icon matIconPrefix aria-hidden="true">search</mat-icon>
+      <input matInput type="search" [formControl]="searchControl" autocomplete="off" />
+      @if (searchControl.value) {
+        <button mat-icon-button matIconSuffix type="button" (click)="searchControl.setValue('')" aria-label="Clear search">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full sm:w-48" subscriptSizing="dynamic">
+      <mat-label>Status</mat-label>
+      <mat-select [value]="query().status" (selectionChange)="onStatusChange($event.value)">
+        <mat-option [value]="null">All statuses</mat-option>
+        @for (status of statuses; track status) {
+          <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Salary range: a job matches when its own salary range overlaps the selected one.
+       The URL changes when a thumb is released; the summary follows the thumbs while dragging. -->
+  <div class="salary-filter flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+    <span id="salary-filter-label" class="whitespace-nowrap text-sm font-medium">Salary range (LPA)</span>
+    <div class="min-w-0 flex-1">
+      <mat-slider
+        class="salary-slider"
+        [min]="0"
+        [max]="salarySliderMax"
+        [step]="1"
+        discrete
+        [displayWith]="formatSliderValue"
+        aria-labelledby="salary-filter-label"
+      >
+        <input
+          matSliderStartThumb
+          [value]="sliderFrom()"
+          (input)="onThumbInput('from', $event)"
+          (valueChange)="sliderFrom.set($event); onSalaryChange()"
+          aria-label="Minimum salary in LPA"
+        />
+        <input
+          matSliderEndThumb
+          [value]="sliderTo()"
+          (input)="onThumbInput('to', $event)"
+          (valueChange)="sliderTo.set($event); onSalaryChange()"
+          aria-label="Maximum salary in LPA"
+        />
+      </mat-slider>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="salary-summary whitespace-nowrap text-sm" aria-live="polite">{{ salarySummary() }}</span>
+      <!-- Always rendered, only hidden: if the button appeared and disappeared, the slider's width would
+           change while its thumbs stay where they were drawn, leaving the right thumb under this text -->
+      <span [class.invisible]="!salaryFilterActive()" [attr.aria-hidden]="!salaryFilterActive()">
+        <button
+          mat-button
+          type="button"
+          (click)="clearSalary()"
+          [disabled]="!salaryFilterActive()"
+          aria-label="Clear salary range"
+        >
+          Clear
+        </button>
+      </span>
+    </div>
+  </div>
+
+  @if (error(); as message) {
+    <div class="app-error-banner" role="alert">Couldn't load applications. {{ message }}</div>
+  }
+
+  <div class="table-card">
+    <div class="h-1">
+      @if (loading()) {
+        <mat-progress-bar mode="indeterminate" aria-label="Loading applications" />
+      }
+    </div>
+
+    <!-- Wide tables scroll inside this box instead of stretching the page on phones -->
+    <div class="overflow-x-auto">
+      <table
+        mat-table
+        [dataSource]="rows()"
+        matSort
+        [matSortActive]="query().sort.active"
+        [matSortDirection]="sortDirection()"
+        (matSortChange)="onSortChange($event)"
+        class="w-full"
+      >
+        <ng-container matColumnDef="company">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Company</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="font-semibold">{{ row.company }}</span>
+            <!-- On phones the role column is hidden, so show it under the company -->
+            @if (!displayedColumns().includes('role')) {
+              <div class="text-xs opacity-70">{{ row.role }}</div>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="role">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Role</th>
+          <td mat-cell *matCellDef="let row">{{ row.role }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="status-badge" [attr.data-status]="row.status">{{ statusLabel(row.status) }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="location">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Location</th>
+          <td mat-cell *matCellDef="let row">{{ row.location ?? '—' }}</td>
+        </ng-container>
+
+        <!-- Two columns, one per database field, so each can be sorted on its own.
+             The column ids match the backend's sort properties (mat-sort-header uses the id). -->
+        <ng-container matColumnDef="salaryMinLpa">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="numeric-cell">Min salary</th>
+          <td mat-cell *matCellDef="let row" class="numeric-cell">{{ formatLpa(row.salaryMinLpa) }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="salaryMaxLpa">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="numeric-cell">Max salary</th>
+          <td mat-cell *matCellDef="let row" class="numeric-cell">{{ formatLpa(row.salaryMaxLpa) }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="appliedOn">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Applied</th>
+          <td mat-cell *matCellDef="let row" class="whitespace-nowrap">
+            {{ row.appliedOn ? (row.appliedOn | date: (isWide() ? 'd MMM y' : 'd MMM')) : '—' }}
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns()"
+          class="clickable-row"
+          tabindex="0"
+          [attr.aria-label]="'Open details for ' + row.company + ', ' + row.role"
+          (click)="openDetails(row)"
+          (keydown.enter)="openDetails(row)"
+        ></tr>
+
+        <tr class="mat-mdc-row" *matNoDataRow>
+          <td class="mat-mdc-cell px-4 py-10 text-center" [attr.colspan]="displayedColumns().length">
+            @if (!loading()) {
+              @if (query().searchText || query().status || salaryFilterActive()) {
+                <span>No applications match these filters.</span>
+                <button mat-button type="button" (click)="clearFilters()">Clear filters</button>
+              } @else {
+                <span>No applications yet.</span>
+              }
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <mat-paginator
+      [length]="totalElements()"
+      [pageIndex]="query().page"
+      [pageSize]="query().size"
+      [pageSizeOptions]="pageSizes"
+      (page)="onPage($event)"
+      aria-label="Select page of applications"
+    />
+  </div>
+</section>

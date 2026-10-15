@@ -1,0 +1,53 @@
+<!-- The wrapper owns positioning (Tailwind); Material components keep their own styling untouched -->
+<header class="app-header sticky top-0 z-10 shadow-sm">
+  <mat-toolbar>
+    <a routerLink="/board" class="flex items-center gap-2 no-underline text-inherit">
+      <mat-icon aria-hidden="true">work_outline</mat-icon>
+      <span class="font-semibold tracking-tight">JobTrackr</span>
+    </a>
+
+    <span class="flex-1"></span>
+
+    <!-- Name next to the icon on wider screens; the icon alone on phones -->
+    <span class="mr-1 hidden max-w-48 truncate text-sm sm:inline">{{ displayName() }}</span>
+    <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+      <mat-icon>account_circle</mat-icon>
+    </button>
+    <mat-menu #userMenu="matMenu" xPosition="before">
+      @if (user(); as signedIn) {
+        <div class="px-4 py-2">
+          <div class="text-sm font-semibold">{{ signedIn.fullName ?? 'Signed in as' }}</div>
+          <div class="text-xs opacity-70">{{ signedIn.email }}</div>
+        </div>
+        <mat-divider />
+      }
+      <button mat-menu-item (click)="logout()">
+        <mat-icon>logout</mat-icon>
+        <span>Log out</span>
+      </button>
+    </mat-menu>
+  </mat-toolbar>
+
+  <!-- Board / List switch: tab links, so each view has its own URL and works with back/forward -->
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel" mat-stretch-tabs="false" mat-align-tabs="start" aria-label="Views">
+    <a mat-tab-link routerLink="/board" routerLinkActive #boardLink="routerLinkActive" [active]="boardLink.isActive">
+      <mat-icon class="mr-2" aria-hidden="true">view_kanban</mat-icon>Board
+    </a>
+    <a
+      mat-tab-link
+      routerLink="/list"
+      routerLinkActive
+      #listLink="routerLinkActive"
+      [active]="listLink.isActive"
+      [routerLinkActiveOptions]="{ paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored' }"
+    >
+      <mat-icon class="mr-2" aria-hidden="true">table_rows</mat-icon>List
+    </a>
+  </nav>
+</header>
+
+<mat-tab-nav-panel #tabPanel>
+  <main class="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 sm:py-6">
+    <router-outlet />
+  </main>
+</mat-tab-nav-panel>

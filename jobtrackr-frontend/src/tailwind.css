@@ -1,0 +1,15 @@
+/*
+ * Tailwind CSS v4. Plain CSS on purpose: Tailwind v4 is its own build tool and is not meant to run
+ * through Sass, so it lives here and Angular Material's Sass theme lives in styles.scss.
+ * Both are listed under "styles" in angular.json.
+ *
+ * Tailwind puts everything in cascade layers (base, components, utilities). Material's styles are
+ * unlayered, and unlayered CSS always beats layered CSS, so Tailwind's reset and utilities can never
+ * override a Material component. Use Tailwind for layout around Material widgets, not to restyle them.
+ */
+@import "tailwindcss";
+
+@theme {
+  /* Same font as the Material theme, so Tailwind text and Material text match */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

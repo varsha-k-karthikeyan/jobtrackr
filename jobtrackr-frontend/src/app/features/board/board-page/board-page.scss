@@ -1,0 +1,105 @@
+@use '@angular/material' as mat;
+
+// Board layout. Columns scroll sideways (with snap) on phones and sit side by side from 768px.
+// Written as plain CSS rather than Tailwind classes because the same rules are needed by the
+// skeleton and the real board, and the drag classes (.cdk-drag-*) can only be styled here.
+
+.board-columns {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.5rem;
+
+  @media (min-width: 768px) {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+}
+
+// A column is a vertical flex box: header on top, the drop list fills ALL remaining height (see .card-list).
+// Columns already stretch to the tallest one (grid/flex default), and the min-height keeps a generous
+// drop target on a board with few cards, roughly down to the bottom of the viewport.
+.board-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 min(85vw, 20rem);
+  min-height: max(20rem, calc(100dvh - 21rem));
+  scroll-snap-align: start;
+  padding: 0.75rem;
+  border-radius: var(--mat-sys-corner-large);
+  background: var(--mat-sys-surface-container);
+}
+
+.count-badge {
+  min-width: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font: var(--mat-sys-label-medium);
+  text-align: center;
+}
+
+// Compact "+" next to each column's count
+.column-add-button {
+  @include mat.icon-button-density(-3);
+}
+
+// The cdkDropList. CDK only accepts a drop while the pointer is inside this element, so it must cover the
+// whole column below the header, not just the height of its cards: flex: 1 makes it fill the column.
+// Dropping in the empty area below the last card puts the card at the bottom of that column.
+.card-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 6rem;
+}
+
+.empty-column {
+  flex: 1 1 auto; // the "Drop applications here" hint fills the empty column too
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 6rem;
+  border: 2px dashed var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.skeleton-block {
+  background: var(--mat-sys-surface-container-highest);
+}
+
+// ---- Drag and drop ----
+
+// Where the card will land. CDK's default placeholder is a same-size copy of the dragged card, which keeps
+// its sorting maths exact (a custom placeholder of a different height makes drop slots drift), so it is
+// only restyled here: faded, with a dashed outline.
+.cdk-drag-placeholder {
+  opacity: 0.35;
+  outline: 2px dashed var(--mat-sys-primary);
+  outline-offset: -2px;
+  border-radius: var(--mat-sys-corner-medium);
+}
+
+// The copy that follows the pointer (rendered in <body>, keeps this component's style scope)
+.cdk-drag-preview {
+  box-shadow: var(--mat-sys-level3);
+  border-radius: var(--mat-sys-corner-medium);
+  transform: rotate(2deg);
+}
+
+// Other cards glide out of the way instead of jumping
+.card-list.cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.cdk-drag-animating {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}

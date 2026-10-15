@@ -1,0 +1,41 @@
+@use '@angular/material' as mat;
+
+:host {
+  display: block;
+}
+
+.application-card {
+  cursor: grab;
+
+  // Visible keyboard focus in the theme colour (the card is focusable and opens on Enter)
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+  }
+}
+
+.meta-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+// Follow-up chip colours through Material's own override API (not CSS that fights its internals).
+// Overdue uses the theme's error colours, today the tertiary colours; upcoming keeps the default look.
+.follow-up-overdue {
+  @include mat.chips-overrides((
+    elevated-container-color: var(--mat-sys-error-container),
+    outline-color: var(--mat-sys-error),
+    label-text-color: var(--mat-sys-on-error-container),
+    with-icon-icon-color: var(--mat-sys-on-error-container),
+  ));
+}
+
+.follow-up-today {
+  @include mat.chips-overrides((
+    elevated-container-color: var(--mat-sys-tertiary-container),
+    outline-color: var(--mat-sys-tertiary),
+    label-text-color: var(--mat-sys-on-tertiary-container),
+    with-icon-icon-color: var(--mat-sys-on-tertiary-container),
+  ));
+}

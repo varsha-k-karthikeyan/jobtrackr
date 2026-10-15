@@ -1,0 +1,94 @@
+<section class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-baseline gap-3">
+      <h1 class="m-0 text-2xl font-semibold">Board</h1>
+      @if (store.loaded()) {
+        <span class="text-sm opacity-70">{{ store.total() }} {{ store.total() === 1 ? 'application' : 'applications' }}</span>
+      }
+    </div>
+    <button mat-flat-button type="button" (click)="addApplication()">
+      <mat-icon>add</mat-icon>
+      Add application
+    </button>
+  </div>
+
+  @if (store.loaded()) {
+    <app-stats-strip />
+  }
+
+  @if (store.error(); as message) {
+    <!-- Load failed: keep any board already on screen, offer a retry -->
+    <div class="app-error-banner flex flex-wrap items-center justify-between gap-3" role="alert">
+      <span>Couldn't load your board. {{ message }}</span>
+      <button mat-stroked-button type="button" (click)="retry()" [disabled]="store.loading()">
+        <mat-icon>refresh</mat-icon>
+        Retry
+      </button>
+    </div>
+  }
+
+  @if (!store.loaded() && store.loading()) {
+    <!-- First load: skeleton columns in the same layout as the real board -->
+    <div class="board-columns" aria-busy="true" aria-label="Loading board">
+      @for (status of statuses; track status) {
+        <div class="board-column">
+          <div class="mb-3 h-4 w-24 animate-pulse rounded skeleton-block"></div>
+          @for (placeholder of skeletonCards; track placeholder) {
+            <div class="mb-3 h-24 animate-pulse rounded-xl skeleton-block"></div>
+          }
+        </div>
+      }
+    </div>
+  } @else if (store.loaded()) {
+    <!-- cdkScrollable: lets a drag auto-scroll this sideways-scrolling container on small screens -->
+    <div class="board-columns" cdkDropListGroup cdkScrollable>
+      @for (status of statuses; track status) {
+        <div class="board-column">
+          <div class="mb-3 flex items-center justify-between gap-2 px-1">
+            <h2 class="m-0 text-sm font-semibold uppercase tracking-wide">{{ labels[status] }}</h2>
+            <div class="flex items-center gap-1">
+              <span class="count-badge" [attr.aria-label]="store.counts()[status] + ' applications'">
+                {{ store.counts()[status] }}
+              </span>
+              <button
+                mat-icon-button
+                type="button"
+                class="column-add-button"
+                (click)="addApplication(status)"
+                [attr.aria-label]="'Add application to ' + labels[status]"
+              >
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="card-list"
+            cdkDropList
+            [cdkDropListData]="status"
+            (cdkDropListDropped)="drop($event)"
+            [attr.aria-label]="labels[status] + ' column'"
+          >
+            @for (card of store.board()[status]; track card.id) {
+              <app-application-card
+                cdkDrag
+                [cdkDragData]="card"
+                [cdkDragStartDelay]="dragStartDelay"
+                (cdkDragEnded)="dragEnded()"
+                [application]="card"
+                (open)="openDetails($event)"
+                (edit)="edit($event)"
+                (delete)="delete($event)"
+              />
+            } @empty {
+              <div class="empty-column">
+                <mat-icon aria-hidden="true">inbox</mat-icon>
+                <span>Drop applications here</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>

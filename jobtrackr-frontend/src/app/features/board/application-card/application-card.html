@@ -1,0 +1,97 @@
+@let card = application();
+<!-- The whole card opens the details drawer: by click, or Enter/Space when focused with the keyboard -->
+<mat-card
+  appearance="outlined"
+  class="application-card"
+  tabindex="0"
+  role="button"
+  [attr.aria-label]="'Open details for ' + card.company + ', ' + card.role"
+  (click)="open.emit(card)"
+  (keydown.enter)="open.emit(card)"
+  (keydown.space)="$event.preventDefault(); open.emit(card)"
+>
+  <mat-card-content>
+    <!-- Layout on a plain inner element: Tailwind utilities on mat-card-content itself would lose to Material -->
+    <div class="flex flex-col gap-2">
+      <div class="flex items-start gap-1">
+        <div class="min-w-0 flex-1">
+          <div class="company truncate font-semibold" [title]="card.company">{{ card.company }}</div>
+          <div class="line-clamp-2 text-sm opacity-80">{{ card.role }}</div>
+        </div>
+        <!-- stopPropagation: using the menu must not also open the drawer -->
+        <button
+          mat-icon-button
+          class="card-menu-button -mr-2 -mt-2"
+          [matMenuTriggerFor]="cardMenu"
+          [attr.aria-label]="'Actions for ' + card.company"
+          (click)="$event.stopPropagation()"
+          (keydown.enter)="$event.stopPropagation()"
+        >
+          <mat-icon>more_vert</mat-icon>
+        </button>
+        <mat-menu #cardMenu="matMenu" xPosition="before">
+          <button mat-menu-item (click)="edit.emit(card)">
+            <mat-icon>edit</mat-icon>
+            <span>Edit</span>
+          </button>
+          <button mat-menu-item (click)="delete.emit(card)">
+            <mat-icon>delete</mat-icon>
+            <span>Delete</span>
+          </button>
+        </mat-menu>
+      </div>
+
+      @if (card.location || salary()) {
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
+          @if (card.location) {
+            <span class="inline-flex items-center gap-1">
+              <mat-icon class="meta-icon" aria-hidden="true">location_on</mat-icon>{{ card.location }}
+            </span>
+          }
+          @if (salary(); as salaryText) {
+            <span class="inline-flex items-center gap-1">
+              <mat-icon class="meta-icon" aria-hidden="true">payments</mat-icon>{{ salaryText }}
+            </span>
+          }
+        </div>
+      }
+
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs opacity-70">
+          @if (card.appliedOn) {
+            Applied {{ card.appliedOn | date: 'd MMM' }}
+          }
+          @if (card.appliedOn && card.source) {
+            ·
+          }
+          {{ card.source }}
+        </span>
+
+        @if (followUp(); as followUpInfo) {
+          <mat-chip-set>
+            <mat-chip
+              disableRipple
+              [class.follow-up-overdue]="followUpInfo.state === 'overdue'"
+              [class.follow-up-today]="followUpInfo.state === 'today'"
+            >
+              <mat-icon matChipAvatar aria-hidden="true">
+                {{ followUpInfo.state === 'upcoming' ? 'event' : 'notification_important' }}
+              </mat-icon>
+              @switch (followUpInfo.state) {
+                @case ('overdue') {
+                  Overdue · {{ followUpInfo.date | date: 'd MMM' }}
+                }
+                @case ('today') {
+                  Follow up today
+                }
+                @default {
+                  Follow up {{ followUpInfo.date | date: 'd MMM' }}
+                }
+              }
+            </mat-chip>
+          </mat-chip-set>
+        }
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

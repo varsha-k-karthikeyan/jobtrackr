@@ -1,0 +1,137 @@
+<div class="flex h-full flex-col">
+  <!-- Header: title, actions, close -->
+  <div class="drawer-header flex items-start gap-2 px-5 pb-3 pt-4">
+    <div class="min-w-0 flex-1">
+      @if (detail(); as current) {
+        <h2 class="m-0 truncate text-xl font-semibold" [title]="current.application.company">{{ current.application.company }}</h2>
+        <p class="m-0 mt-0.5 text-sm opacity-80">{{ current.application.role }}</p>
+      } @else {
+        <h2 class="m-0 text-xl font-semibold">Application</h2>
+      }
+    </div>
+    @if (detail()) {
+      <button mat-icon-button type="button" (click)="edit()" aria-label="Edit application">
+        <mat-icon>edit</mat-icon>
+      </button>
+      <button mat-icon-button type="button" (click)="delete()" aria-label="Delete application">
+        <mat-icon>delete</mat-icon>
+      </button>
+    }
+    <button mat-icon-button type="button" (click)="close()" aria-label="Close details">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading details" />
+  } @else {
+    <mat-divider />
+  }
+
+  <div class="flex-1 overflow-y-auto px-5 py-4">
+    @if (loadError(); as message) {
+      <div class="app-error-banner flex flex-wrap items-center justify-between gap-3" role="alert">
+        <span>{{ message }}</span>
+        <button mat-stroked-button type="button" (click)="load()">Retry</button>
+      </div>
+    } @else if (detail(); as current) {
+      @let card = current.application;
+
+      <dl class="detail-grid m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt>Status</dt>
+        <dd><span class="status-badge" [attr.data-status]="card.status">{{ statusLabels[card.status] }}</span></dd>
+
+        <dt>Location</dt>
+        <dd>{{ card.location ?? '—' }}</dd>
+
+        <dt>Salary</dt>
+        <dd>{{ salary() ?? '—' }}</dd>
+
+        <dt>Source</dt>
+        <dd>{{ card.source ?? '—' }}</dd>
+
+        <dt>Applied on</dt>
+        <dd>{{ card.appliedOn ? (card.appliedOn | date: 'd MMM y') : '—' }}</dd>
+
+        <dt>Follow up</dt>
+        <dd [class.follow-up-overdue]="followUp() === 'overdue'" [class.follow-up-today]="followUp() === 'today'">
+          @if (card.followUpOn) {
+            {{ card.followUpOn | date: 'd MMM y' }}
+            @if (followUp() === 'overdue') { (overdue) } @else if (followUp() === 'today') { (today) }
+          } @else {
+            —
+          }
+        </dd>
+
+        <dt>Job link</dt>
+        <dd class="min-w-0">
+          @if (card.jdUrl) {
+            <a class="app-link break-all" [href]="card.jdUrl" target="_blank" rel="noopener noreferrer">
+              {{ card.jdUrl }}
+              <mat-icon class="inline-icon" aria-hidden="true">open_in_new</mat-icon>
+              <span class="sr-only">(opens in a new tab)</span>
+            </a>
+          } @else {
+            —
+          }
+        </dd>
+      </dl>
+
+      @if (card.jdText) {
+        <h3 class="section-title">Job description</h3>
+        <div class="jd-text">{{ card.jdText }}</div>
+      }
+
+      <h3 class="section-title">Notes</h3>
+      <!-- Not a <form>: with a lone [formControl] there is no NgForm/FormGroupDirective to intercept
+           submit, so a submit button would trigger a native submission and reload the page. -->
+      <div class="flex flex-col gap-2">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" hideRequiredMarker>
+          <mat-label>Add a note</mat-label>
+          <textarea
+            matInput
+            [formControl]="noteControl"
+            rows="2"
+            placeholder="e.g. Recruiter call scheduled"
+            (keydown.control.enter)="addNote()"
+          ></textarea>
+          <mat-hint>Ctrl + Enter to add</mat-hint>
+          @if (noteControl.hasError('required') && noteControl.touched) {
+            <mat-error>Write something first</mat-error>
+          }
+        </mat-form-field>
+        <div class="flex justify-end">
+          <button mat-flat-button type="button" (click)="addNote()" [disabled]="savingNote()">
+            <mat-icon>add_comment</mat-icon>
+            Add note
+          </button>
+        </div>
+      </div>
+
+      @if (current.notes.length === 0) {
+        <p class="m-0 mt-3 text-sm opacity-70">No notes yet.</p>
+      } @else {
+        <ol class="timeline mt-3 list-none p-0" aria-label="Notes, newest first">
+          @for (note of current.notes; track note.id) {
+            <li class="timeline-item">
+              <div class="flex items-start gap-2">
+                <div class="min-w-0 flex-1">
+                  <time class="block text-xs opacity-70" [attr.datetime]="note.createdAt">
+                    {{ note.createdAt | date: 'd MMM y, h:mm a' }}
+                  </time>
+                  <p class="m-0 mt-0.5 whitespace-pre-line break-words text-sm">{{ note.body }}</p>
+                </div>
+                <button mat-icon-button type="button" class="-mr-2 -mt-2" (click)="deleteNote(note.id)" aria-label="Delete note">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            </li>
+          }
+        </ol>
+      }
+
+      <p class="m-0 mt-6 text-xs opacity-60">
+        Created {{ card.createdAt | date: 'd MMM y, h:mm a' }} · Updated {{ card.updatedAt | date: 'd MMM y, h:mm a' }}
+      </p>
+    }
+  </div>
+</div>

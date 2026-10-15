@@ -1,0 +1,41 @@
+// The slider fills the space between its label and the summary. Width only: Material's own side margins
+// stay, because they keep the end thumbs inside the slider (with margin: 0 the "100+" thumb overflowed).
+.salary-slider {
+  display: block;
+  width: auto;
+}
+
+// Beside the slider (from 640px) it has a fixed width and is right-aligned, so the row does not shift while
+// the text changes during a drag. Stacked under the slider on phones it simply starts at the left.
+.salary-summary {
+  @media (min-width: 640px) {
+    min-width: 8.5rem;
+    text-align: right;
+  }
+}
+
+.table-card {
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-large);
+  background: var(--mat-sys-surface);
+}
+
+// Amounts line up on the right, like numbers in a spreadsheet
+.numeric-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.clickable-row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-low);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: -2px;
+  }
+}

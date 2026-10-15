@@ -1,0 +1,158 @@
+<!-- Header: title plus a close icon that behaves exactly like Cancel (closes without saving) -->
+<div class="flex items-center justify-between gap-2 pr-3">
+  <h2 mat-dialog-title>{{ isEdit ? 'Edit application' : 'Add application' }}</h2>
+  <button mat-icon-button type="button" mat-dialog-close [disabled]="saving()" aria-label="Close without saving">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content>
+  @if (conflict()) {
+    <div class="app-warning-banner mb-4" role="alert">
+      This card was changed elsewhere (another tab or device). The form now shows the latest version;
+      make your changes again and save.
+    </div>
+  }
+  @if (errorMessage(); as message) {
+    <div class="app-error-banner mb-4" role="alert">{{ message }}</div>
+  }
+
+  <!-- pt-2: room for the first row's floating outline labels, which mat-dialog-content would clip -->
+  <form id="application-form" class="pt-2" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <!-- gap-y-4: an outlined field's floating label sits above its box, into the hint line of the field
+         above; the row gap keeps hints and errors readable instead of colliding with the next label -->
+    <div class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+      <mat-form-field appearance="outline">
+        <mat-label>Company</mat-label>
+        <input matInput formControlName="company" cdkFocusInitial />
+        @if (form.controls.company.hasError('required')) {
+          <mat-error>Company is required</mat-error>
+        } @else if (form.controls.company.hasError('maxlength')) {
+          <mat-error>At most 150 characters</mat-error>
+        } @else if (form.controls.company.hasError('server')) {
+          <mat-error>{{ form.controls.company.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Role</mat-label>
+        <input matInput formControlName="role" />
+        @if (form.controls.role.hasError('required')) {
+          <mat-error>Role is required</mat-error>
+        } @else if (form.controls.role.hasError('maxlength')) {
+          <mat-error>At most 150 characters</mat-error>
+        } @else if (form.controls.role.hasError('server')) {
+          <mat-error>{{ form.controls.role.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- A hint must fit on one line at every width (Material reserves exactly one line under a field) -->
+      <mat-form-field appearance="outline">
+        <mat-label>Status</mat-label>
+        <mat-select formControlName="status">
+          @for (status of statuses; track status) {
+            <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+          }
+        </mat-select>
+        @if (isEdit && form.controls.status.value !== originalStatus) {
+          <mat-hint>Moves to the bottom of {{ statusLabels[form.controls.status.value] }}</mat-hint>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Source</mat-label>
+        <mat-select formControlName="source">
+          <mat-option [value]="null">Not specified</mat-option>
+          @for (source of sources; track source) {
+            <mat-option [value]="source">{{ source }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Location</mat-label>
+        <input matInput formControlName="location" placeholder="e.g. Bengaluru, Remote" />
+        @if (form.controls.location.hasError('maxlength')) {
+          <mat-error>At most 100 characters</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Salary pair: the range error belongs to the group, so it is shown under the max field -->
+      <div class="grid grid-cols-2 gap-x-3">
+        <mat-form-field appearance="outline">
+          <mat-label>Min salary</mat-label>
+          <input matInput type="number" min="0" step="0.5" formControlName="salaryMinLpa" />
+          <span matTextSuffix>LPA</span>
+          @if (form.controls.salaryMinLpa.hasError('min')) {
+            <mat-error>Can't be negative</mat-error>
+          } @else if (form.controls.salaryMinLpa.hasError('max')) {
+            <mat-error>At most 999.99</mat-error>
+          } @else if (form.controls.salaryMinLpa.hasError('maxDecimalPlaces')) {
+            <mat-error>At most 2 decimals</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Max salary</mat-label>
+          <input matInput type="number" min="0" step="0.5" formControlName="salaryMaxLpa" />
+          <span matTextSuffix>LPA</span>
+          @if (form.controls.salaryMaxLpa.hasError('min')) {
+            <mat-error>Can't be negative</mat-error>
+          } @else if (form.controls.salaryMaxLpa.hasError('max')) {
+            <mat-error>At most 999.99</mat-error>
+          } @else if (form.controls.salaryMaxLpa.hasError('maxDecimalPlaces')) {
+            <mat-error>At most 2 decimals</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Applied on</mat-label>
+        <input matInput [matDatepicker]="appliedPicker" formControlName="appliedOn" placeholder="dd/mm/yyyy" />
+        <mat-datepicker-toggle matIconSuffix [for]="appliedPicker" />
+        <mat-datepicker #appliedPicker />
+        @if (form.controls.appliedOn.hasError('matDatepickerParse')) {
+          <mat-error>Use the format dd/mm/yyyy</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Follow up on</mat-label>
+        <input matInput [matDatepicker]="followUpPicker" formControlName="followUpOn" placeholder="dd/mm/yyyy" />
+        <mat-datepicker-toggle matIconSuffix [for]="followUpPicker" />
+        <mat-datepicker #followUpPicker />
+        @if (form.controls.followUpOn.hasError('matDatepickerParse')) {
+          <mat-error>Use the format dd/mm/yyyy</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sm:col-span-2">
+        <mat-label>Job description URL</mat-label>
+        <input matInput type="url" formControlName="jdUrl" placeholder="https://" />
+        @if (form.controls.jdUrl.hasError('pattern')) {
+          <mat-error>Enter a link starting with http:// or https://</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sm:col-span-2">
+        <mat-label>Job description</mat-label>
+        <textarea matInput formControlName="jdText" rows="5" placeholder="Paste the job description (used for the resume match)"></textarea>
+      </mat-form-field>
+    </div>
+
+    @if (form.hasError('salaryRange') && (form.controls.salaryMinLpa.touched || form.controls.salaryMaxLpa.touched)) {
+      <p class="salary-range-error m-0 -mt-2 mb-2 text-xs" role="alert">Min salary can't be more than max salary</p>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancel</button>
+  <button mat-flat-button type="submit" form="application-form" [disabled]="saving()">
+    <span class="inline-flex items-center gap-2">
+      @if (saving()) {
+        <mat-progress-spinner mode="indeterminate" diameter="18" aria-label="Saving" />
+      }
+      {{ isEdit ? 'Save changes' : 'Add application' }}
+    </span>
+  </button>
+</mat-dialog-actions>

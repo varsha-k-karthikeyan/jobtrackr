@@ -1,0 +1,4 @@
+// Toolbar and tabs share one background so the sticky header reads as a single bar
+.app-header {
+  background: var(--mat-sys-surface);
+}

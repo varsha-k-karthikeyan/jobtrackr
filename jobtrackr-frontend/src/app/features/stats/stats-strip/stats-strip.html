@@ -1,0 +1,31 @@
+@let current = stats();
+<div class="grid grid-cols-2 gap-3 md:grid-cols-4" role="group" aria-label="Application statistics">
+  <div class="stat-tile">
+    <mat-icon class="stat-icon" aria-hidden="true">work_outline</mat-icon>
+    <div>
+      <div class="stat-value" data-stat="total">{{ current.total }}</div>
+      <div class="stat-label">Total applied</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <mat-icon class="stat-icon" aria-hidden="true">forum</mat-icon>
+    <div>
+      <div class="stat-value" data-stat="interview">{{ current.interview }}</div>
+      <div class="stat-label">Interviews</div>
+    </div>
+  </div>
+  <div class="stat-tile">
+    <mat-icon class="stat-icon" aria-hidden="true">emoji_events</mat-icon>
+    <div>
+      <div class="stat-value" data-stat="offer">{{ current.offer }}</div>
+      <div class="stat-label">Offers</div>
+    </div>
+  </div>
+  <div class="stat-tile" title="Share of applications that got any answer: interview, offer or rejection">
+    <mat-icon class="stat-icon" aria-hidden="true">insights</mat-icon>
+    <div>
+      <div class="stat-value" data-stat="responseRate">{{ current.responseRate | percent: '1.0-0' }}</div>
+      <div class="stat-label">Response rate</div>
+    </div>
+  </div>
+</div>

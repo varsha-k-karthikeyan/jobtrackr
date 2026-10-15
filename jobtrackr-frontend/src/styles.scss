@@ -1,0 +1,107 @@
+// Global styles. Angular Material's theme lives here because it needs Sass;
+// Tailwind lives in tailwind.css (plain CSS). Both are listed under "styles" in angular.json.
+@use 'sass:map';
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+
+  // Material 3 theme: emits --mat-sys-* CSS variables that every Material component reads.
+  // Use those variables (not hard-coded colours) in custom styles so everything stays on one theme.
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$violet-palette,
+    ),
+    typography: Inter,
+    density: 0,
+  ));
+
+  // Material 3 has no "success" role, so the app defines one from Material's own green palette
+  // (tone 95 = soft container, tone 20 = readable text on it), named like the --mat-sys-* roles.
+  --app-success-container: #{map.get(mat.$green-palette, 95)};
+  --app-on-success-container: #{map.get(mat.$green-palette, 20)};
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+// Small app-wide pieces that need theme colours. Kept here (not in Tailwind) so they read the
+// Material system variables and follow the theme automatically.
+
+// Inline error message box: forms, failed page loads
+.app-error-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--mat-sys-corner-medium);
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+  font: var(--mat-sys-body-medium);
+}
+
+// Inline warning box: e.g. "this card was changed elsewhere"
+.app-warning-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--mat-sys-corner-medium);
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font: var(--mat-sys-body-medium);
+}
+
+// Right-hand drawer built from MatDialog (details panel): square edges, full height
+.app-drawer-panel {
+  @include mat.dialog-overrides((
+    container-shape: 0,
+  ));
+}
+
+// Status pill used in the drawer and the list: <span class="status-badge" data-status="OFFER">
+.status-badge {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font: var(--mat-sys-label-medium);
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+
+  &[data-status='INTERVIEW'] {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  // Outcomes read at a glance: an offer is green, a rejection red (the theme's error colours)
+  &[data-status='OFFER'] {
+    background: var(--app-success-container);
+    color: var(--app-on-success-container);
+  }
+
+  &[data-status='REJECTED'] {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+  }
+}
+
+// Text link in the theme's primary colour
+.app-link {
+  color: var(--mat-sys-primary);
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+// Spinners inside filled buttons take the button's text colour instead of the primary colour
+.mat-mdc-unelevated-button .mat-mdc-progress-spinner {
+  --mat-progress-spinner-active-indicator-color: currentColor;
+}

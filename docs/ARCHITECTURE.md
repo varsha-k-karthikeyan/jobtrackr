@@ -195,7 +195,14 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 
 - The signing key comes from the `JWT_SECRET` environment variable through `JwtProperties`. HS256 is symmetric: the same key signs and verifies.
 - Public paths: `/api/v1/auth/**` and the Swagger paths. Everything else, including `/actuator/**`, needs a token.
-- There is no server-side session and no logout: a token is valid until it expires (15 minutes). Refresh tokens are not built yet.
+- **Two tokens.** The access token is a 15-minute JWT sent as `Authorization: Bearer`; it is stateless, so the API never looks it up. The refresh token is a random, opaque 256-bit value that lasts 14 days and lives only in an **httpOnly cookie** (`jobtrackr_refresh`, `SameSite=Strict`, `Path=/api/v1/auth`). JavaScript cannot read it, so an XSS bug can steal at most a token that expires within minutes.
+- **Stored as a hash.** `refresh_tokens` (V5) keeps only the SHA-256 of each refresh token. A fast hash is right here (unlike passwords, which need BCrypt): the token has 256 bits of entropy, so there is nothing to brute-force, and a deterministic hash lets the row be found by it.
+- **`POST /api/v1/auth/refresh`** (no body; the browser sends the cookie) rotates: it revokes the presented token, issues a new one in a new cookie, and returns a new access token. The row is read with `SELECT ... FOR UPDATE`, so two simultaneous refreshes with the same token are serialised.
+- **Theft detection.** A token that was already rotated more than 30 seconds ago and is presented again means someone else may have a copy: every active refresh token of that user is revoked (`RefreshTokenService.rotate`). Within the 30 seconds it is treated as a race (two tabs refreshing at once) and simply rejected. The revocation must survive the 401 that follows, hence `@Transactional(noRollbackFor = BadCredentialsException.class)`.
+- **`POST /api/v1/auth/logout`** revokes the refresh token and deletes the cookie. The access token still works until it expires (it is stateless), which is why it is kept short.
+- **CORS** allows credentials, which the cookie needs across ports (`localhost:4200` to `:8080`); that is only permitted because the allowed origins are an explicit list. `SameSite=Strict` works locally because ports do not make a different site; a frontend and API on different domains would need `SameSite=None; Secure` plus CSRF protection.
+- **Frontend:** a 401 from a protected endpoint triggers one shared refresh and a single retry of the original request; only if the refresh fails is the user logged out. After a reload with an expired access token, the route guards restore the session from the cookie. Details in [jobtrackr-frontend/README.md](../jobtrackr-frontend/README.md).
+- **Not done (known limitations):** expired and revoked rows are never deleted (a scheduled cleanup would do it), and there is no "log out everywhere" button, although the reuse detection already does exactly that internally.
 - Restarting with a different `JWT_SECRET` invalidates every token issued before.
 
 ## 9. Stats

@@ -39,7 +39,10 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 |---|---|
 | Empty response body | The security filter rejected the token before any controller ran. Look at the `WWW-Authenticate` response header: it states the reason (expired, invalid signature, malformed) |
 | No `Authorization` header sent | In Swagger, click **Authorize** and paste the token without the word "Bearer" |
-| It worked 15 minutes ago | The token expired. Log in again |
+| It worked 15 minutes ago (API called directly, e.g. Swagger) | The access token expired. Log in again, or call `POST /api/v1/auth/refresh` from the browser (the cookie is needed). The frontend does this automatically |
+| `POST /auth/refresh` returns 401 | No cookie (logged out, cookie expired after 14 days, or blocked), the token was already used (rotation), or it was revoked by logout or theft detection | Log in again. In DevTools > Application > Cookies > `http://localhost:8080`, check `jobtrackr_refresh` exists |
+| Refresh works in Swagger but not from the app | The cookie is not sent cross-origin | Requests to `/auth/*` must use `withCredentials: true`, and CORS must answer `Access-Control-Allow-Credentials: true` (see `CorsConfig`) |
+| Logged out of every tab/device at once | Theft detection: a refresh token that had already been rotated was presented again later | Expected behaviour; log in again. If it happens without reason, check for something replaying old cookies |
 | It worked before the last restart | `JWT_SECRET` changed between runs; old tokens no longer verify. Log in again |
 | Body says `Invalid email or password` | That is the login endpoint. The same message is used for an unknown email on purpose. The demo account's password is `Demo@1234`; if that fails, check that `V4__demo_user_data.sql` has run (`flyway_schema_history`) |
 

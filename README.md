@@ -131,4 +131,6 @@ Built:
 - Backend: Kanban API (CRUD, move, notes), stats, validation and error handling, JWT authentication, CORS, a public demo account, tests.
 - Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, tests.
 
-Not built yet: refresh tokens, resume upload and AI match, follow-up reminder emails, deployment.
+Sessions: a 15-minute access token plus a 14-day refresh token in an httpOnly cookie, rotated on every use, so you stay signed in while you keep using the app (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 8).
+
+Not built yet: resume upload and AI match, follow-up reminder emails, deployment.

@@ -77,6 +77,7 @@ npm test           # unit tests (Vitest)
 - **UI: Angular Material (+ CDK) and Tailwind CSS only**, no other UI library. Material for interactive widgets; Tailwind for layout. Tailwind sits in cascade layers and loses to Material on Material elements, so put utilities on a plain wrapper, never on a Material component, and colour custom pieces with the `--mat-sys-*` theme variables or `mat.*-overrides` mixins.
 - **Folders:** `core` (api, auth, interceptors, guards, models, state, notifications, layout), `features/{auth,board,list,stats}`, `shared` (components, validators, utils).
 - **State:** board state lives in `ApplicationStore` (immutable updates via the pure functions in `board-state.ts`; mutations return Promises). Components never call `HttpClient` directly; the list page is the only direct caller of `ApplicationApiService` (`list()`).
+- **Sessions:** 15-minute access token (localStorage, `Authorization` header) + 14-day refresh token in an httpOnly cookie that JavaScript never sees. All `/auth/*` calls use `withCredentials: true`. On a 401 the auth interceptor does one shared refresh and one retry; guards restore the session after a reload. Never put the refresh token anywhere JavaScript can read.
 - **Errors:** the error interceptor shows one snackbar per failed request; a caller that shows the error itself passes `{ skipErrorToast: true }` (`SKIP_ERROR_TOAST`). 401s are owned by the auth interceptor.
 - **Model types mirror the backend records field for field** (`core/models`); when a DTO changes, update both in the same commit.
 - **No secrets in the frontend.** `apiBaseUrl` comes from `src/environments`. The demo credentials constant is public on purpose.
@@ -101,4 +102,4 @@ npm test           # unit tests (Vitest)
 
 ## Not built yet
 
-Refresh tokens, resumes and AI match (`resumes` and `match_results` tables exist but have no entities), follow-up reminder emails, deployment.
+Resumes and AI match (`resumes` and `match_results` tables exist but have no entities), follow-up reminder emails, deployment, cleanup of expired refresh-token rows.

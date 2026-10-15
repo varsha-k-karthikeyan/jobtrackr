@@ -115,6 +115,7 @@ Base path `/api/v1`. Everything except `/auth/**` needs `Authorization: Bearer <
 | `POST /auth/refresh` | No body: the browser sends the cookie. Rotates the refresh token and returns a new access token |
 | `POST /auth/logout` | Revokes the refresh token and deletes the cookie |
 | `GET /me` | The caller's profile |
+| `PUT /me/password` | Change the password (`currentPassword`, `newPassword`). Ends every session and returns a fresh one for this browser; 400 on a wrong current password, 403 for the demo account |
 | `GET /applications/board` | All cards grouped by status, ordered by position |
 | `GET /applications?status=&searchText=&salaryFrom=&salaryTo=&sort=&page=&size=` | Filtered, sorted, paginated list. `searchText` matches company, role, location, source or status; `salaryFrom`/`salaryTo` (LPA) keep jobs whose salary range overlaps that range; `sort` accepts company, role, status, location, salaryMinLpa, salaryMaxLpa, appliedOn (and a few more), empty values last |
 | `POST /applications` | Create a card (appended to the bottom of its column) |

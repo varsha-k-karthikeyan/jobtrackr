@@ -89,7 +89,7 @@ npm test           # unit tests (Vitest)
 
 - Base path `/api/v1`. Everything needs a Bearer token except `/api/v1/auth/**` and the Swagger paths.
 - POST returns 201 with a `Location` header and the created object; PUT returns 200 with the updated object; DELETE returns 204.
-- Errors are RFC 9457 `ProblemDetail` from `GlobalExceptionHandler`: 400 validation (with an `errors` map), 401 bad credentials, 404 not found, 409 conflict or stale `version`.
+- Errors are RFC 9457 `ProblemDetail` from `GlobalExceptionHandler`: 400 validation (with an `errors` map; services add field errors with `FieldValidationException`), 401 bad credentials or token, 403 forbidden (the demo account's password), 404 not found, 409 conflict or stale `version`. A form-input mistake is never a 401: the frontend treats 401 as an expired session.
 - `PUT /applications/{id}` requires the `version` last read (optimistic locking). Its optional `status` moves the card to the bottom of that column in the same transaction (null keeps it). An exact position is only set through `PATCH /applications/{id}/move` (drag and drop).
 - Lists return `PageResponse`; sortable fields are whitelisted in `ApplicationService`.
 

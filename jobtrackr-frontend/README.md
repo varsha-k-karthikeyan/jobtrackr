@@ -44,9 +44,10 @@ src/app/
 │   ├── list/                  server-side paginated table
 │   └── stats/                 stats strip shown above the board
 └── shared/                    reusable across features
-    ├── components/            create/edit dialog, details drawer, confirm dialog, ApplicationDialogs
+    ├── components/            create/edit dialog, details drawer, confirm dialog, ApplicationDialogs,
+    │                          change-password dialog (lazy), PasswordRules checklist
     ├── utils/                 dates (local calendar logic), salary formatting, dd/mm/yyyy date adapter
-    └── validators/            password strength (mirrors the backend rule)
+    └── validators/            password strength (mirrors the backend rule), matchesControl (confirm field)
 ```
 
 ## How data flows
@@ -89,6 +90,7 @@ Two tokens:
 - `core/interceptors/auth-interceptor.ts` adds the Bearer token to calls to our API only. On a 401 from a protected endpoint it refreshes once and retries the original request once with the new token. If the token was already replaced by another request meanwhile, it just retries. Only when the refresh fails does it clear the session, show one "session expired" message and go to `/login?returnUrl=...`.
 - `core/guards/auth-guards.ts`: `authGuard` protects `/board` and `/list`; `guestGuard` keeps signed-in users away from `/login` and `/register`. Both are async: with no valid access token (a reload after it expired) they first try to restore the session from the cookie.
 - `core/auth/token-storage.ts` also keeps a "session hint" flag, so a silent refresh is only attempted when a cookie probably exists (JavaScript cannot check the cookie itself). Logout clears it.
+- **Change password** (account menu, disabled for the demo account): `AuthService.changePassword` calls `PUT /me/password` with `withCredentials: true`, because the answer sets a new refresh cookie (the backend ended every session, this one included) and the browser only stores a cross-origin cookie from a credentialed request. The fresh access token replaces the stored one, so this tab stays signed in. A wrong current password comes back as a 400 field error and is shown under the field. The dialog is loaded on first use.
 - **Logout** calls `POST /auth/logout` (revokes the refresh token, deletes the cookie) and clears local state without waiting for the network.
 - **Tabs** stay in step through the `storage` event; if two tabs refresh at the same moment, the loser adopts the token the winner saved.
 - `core/interceptors/error-interceptor.ts` shows any other failed request as a snackbar, using the server's ProblemDetail text. Requests whose caller shows the error itself (forms, the edit dialog's 409 handling, drag and drop, auth calls) set `SKIP_ERROR_TOAST`, so nothing is shown twice.
@@ -116,6 +118,7 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 | `core/state/board-state.spec.ts` | Pure move/insert/remove maths, clamping, immutability |
 | `core/auth/auth-service.spec.ts` | Token persistence, restore and expiry on startup, one shared refresh, silent restore from the cookie, logout |
 | `core/interceptors/auth-interceptor.spec.ts` | Bearer only to our API, refresh + single retry on 401, one refresh for simultaneous 401s, no refresh loop, logout when the refresh fails |
+| `shared/components/change-password-dialog/change-password-dialog.spec.ts` | Required and match rules, the exact request (credentials included), token stored on success, server field error and the demo 403 |
 | `shared/components/application-dialog/application-dialog.spec.ts` | Form validation (required, cross-field salary, limits), edit prefill, the exact request body |
 
 HTTP is tested with `HttpTestingController`; no real request leaves a test.

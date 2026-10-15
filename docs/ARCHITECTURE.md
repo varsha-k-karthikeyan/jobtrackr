@@ -192,6 +192,7 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 | Build and sign the token (HS256, subject = user id, expires after `access-token-ttl`) | `TokenService` |
 | Verify the token on every request; decide which paths are public | `SecurityConfig` |
 | Read the user id back out of the verified token | `common/CurrentUserProvider` |
+| Change password (`PUT /api/v1/me/password`): check the current password, store the new BCrypt hash, end every session, start a fresh one for this browser | `AuthService.changePassword`, `PasswordController` |
 
 - The signing key comes from the `JWT_SECRET` environment variable through `JwtProperties`. HS256 is symmetric: the same key signs and verifies.
 - Public paths: `/api/v1/auth/**` and the Swagger paths. Everything else, including `/actuator/**`, needs a token.
@@ -203,6 +204,7 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 - **CORS** allows credentials, which the cookie needs across ports (`localhost:4200` to `:8080`); that is only permitted because the allowed origins are an explicit list. `SameSite=Strict` works locally because ports do not make a different site; a frontend and API on different domains would need `SameSite=None; Secure` plus CSRF protection.
 - **Frontend:** a 401 from a protected endpoint triggers one shared refresh and a single retry of the original request; only if the refresh fails is the user logged out. After a reload with an expired access token, the route guards restore the session from the cookie. Details in [jobtrackr-frontend/README.md](../jobtrackr-frontend/README.md).
 - **Cleanup:** `RefreshTokenCleanupJob` runs nightly (`jobtrackr.refresh-token-cleanup.cron`, default 03:30 India time) and deletes, in one bulk DELETE, rows that expired more than 7 days ago (`RefreshTokenService.EXPIRED_TOKEN_RETENTION`). Revoked rows that have not expired are kept: they are the evidence reuse detection needs, and the 7-day margin keeps that alarm working for a stolen copy replayed just after expiry. Scheduling can be switched off with `jobtrackr.scheduling.enabled=false` (tests do).
+- **Password change** (`PUT /api/v1/me/password`, under `/me` because `/auth/**` is public). A wrong current password is a **400 field error** (`errors.currentPassword`), not a 401: the frontend reads any 401 as an expired session and would refresh instead of showing the message. The new password follows `PasswordPolicy` and must differ from the old one. Every refresh-token row of the user is then **deleted, not revoked**: a revoked token presented after the 30-second grace period counts as theft and would revoke the fresh session too, whereas a deleted one is just unknown (plain 401). Other devices are therefore logged out at their next refresh, and their access tokens keep working for at most 15 minutes. The response carries a new access token and refresh cookie. The public demo account gets a 403 (`user/DemoAccount`).
 - **Not done (known limitation):** there is no "log out everywhere" button, although the reuse detection already does exactly that internally.
 - Restarting with a different `JWT_SECRET` invalidates every token issued before.
 
@@ -252,8 +254,10 @@ Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, so
 | 400 | Bean Validation failed; body has an `errors` map of field to message | `@Valid` on a controller parameter |
 | 400 | Unreadable JSON, unknown enum value, wrong date format; no `errors` map | Spring MVC, before validation |
 | 400 | `sort` names a field that is not whitelisted | `ApplicationService.list` |
+| 400 | A rule only the service can check, e.g. "Current password is incorrect"; same `errors` map shape as Bean Validation | `FieldValidationException` |
 | 401 | Wrong email or password | `AuthService.login` |
 | 401 | Missing, expired or tampered token; **empty body**, reason in the `WWW-Authenticate` header | Security filter, before any controller |
+| 403 | Signed in, but not allowed: changing the demo account's password | `ForbiddenException` |
 | 404 | Record does not exist or belongs to another user | `NotFoundException` |
 | 409 | Stale `version` on update | optimistic-lock exception |
 | 409 | Email already registered | `ConflictException` |

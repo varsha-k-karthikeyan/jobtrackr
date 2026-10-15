@@ -46,6 +46,10 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 | It worked before the last restart | `JWT_SECRET` changed between runs; old tokens no longer verify. Log in again |
 | Body says `Invalid email or password` | That is the login endpoint. The same message is used for an unknown email on purpose. The demo account's password is `Demo@1234`; if that fails, check that `V4__demo_user_data.sql` has run (`flyway_schema_history`) |
 
+### 403
+
+`PUT /me/password` for the demo account: its password is published and shared, so it cannot be changed. Register your own account. (A missing or bad token is a 401, never a 403.)
+
 ### 404 on a record you can see in the database
 
 The record belongs to a different user. Every lookup includes `user_id` (see ARCHITECTURE, section 5). Compare the token's subject with the row:
@@ -68,6 +72,7 @@ To see whose token you hold, call `GET /api/v1/me`.
 - Body has an `errors` map: Bean Validation rejected those fields. The rules are the annotations on the request record in the feature's `dto` package.
 - Body has no `errors` map: the JSON could not be read at all. Typical causes are an unknown status (`"HIRED"`), a date not in `yyyy-MM-dd` form, a trailing comma, or text in a number field.
 - `Cannot sort by '...'`: only the fields listed in `ApplicationService.SORTABLE_FIELDS` are allowed.
+- `PUT /me/password` with `errors.currentPassword: "Current password is incorrect"`: a 400 on purpose, not a 401 (a 401 would make the frontend try a token refresh).
 
 ### CORS error in the browser console
 

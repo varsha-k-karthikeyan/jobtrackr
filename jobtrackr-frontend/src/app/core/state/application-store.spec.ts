@@ -39,6 +39,17 @@ describe('ApplicationStore', () => {
 
   afterEach(() => http.verify());
 
+  it('bumps revision after a successful change, but not after a plain load', async () => {
+    await loadBoard();
+    expect(store.revision()).toBe(0);
+
+    const deleting = store.delete(razorpay.id);
+    http.expectOne(`${API}/applications/${razorpay.id}`).flush(null, { status: 204, statusText: 'No Content' });
+    await deleting;
+
+    expect(store.revision()).toBe(1);
+  });
+
   it('loads the board and derives counts and total', async () => {
     expect(store.loaded()).toBe(false);
     await loadBoard();

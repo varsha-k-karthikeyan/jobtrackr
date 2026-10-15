@@ -40,6 +40,7 @@ export class ApplicationStore {
   private readonly loadedState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private readonly detailState = signal<ApplicationDetail | null>(null);
+  private readonly revisionState = signal(0);
 
   // Bumped by reset(). A response that arrives after a logout belongs to the previous user and is dropped.
   private session = 0;
@@ -52,6 +53,11 @@ export class ApplicationStore {
   readonly error = this.errorState.asReadonly();
   /** The card open in the details drawer, with its notes. */
   readonly detail = this.detailState.asReadonly();
+  /**
+   * Bumped after every successful create, update, delete or move. Lets other features (the notification
+   * bell) refresh when cards change, without this store knowing about them.
+   */
+  readonly revision = this.revisionState.asReadonly();
 
   readonly counts = computed(() => {
     const board = this.boardState();
@@ -94,6 +100,7 @@ export class ApplicationStore {
     const created = await firstValueFrom(this.api.create(request, options));
     if (session === this.session) {
       this.boardState.update((board) => appendCard(board, created));
+      this.markChanged();
     }
     return created;
   }
@@ -115,6 +122,7 @@ export class ApplicationStore {
           : replaceCard(board, updated);
       });
       this.syncDetail(updated);
+      this.markChanged();
     }
     return updated;
   }
@@ -124,6 +132,7 @@ export class ApplicationStore {
     await firstValueFrom(this.api.delete(id, options));
     if (session === this.session) {
       this.boardState.update((board) => removeCard(board, id));
+      this.markChanged();
       if (this.detailState()?.application.id === id) {
         this.detailState.set(null);
       }
@@ -153,6 +162,7 @@ export class ApplicationStore {
         // Take the server's copy: it carries the moved card's new version
         this.boardState.update((board) => replaceCard(board, saved));
         this.syncDetail(saved);
+        this.markChanged();
       }
       return 'moved';
     } catch (error: unknown) {
@@ -226,6 +236,10 @@ export class ApplicationStore {
     this.loadedState.set(false);
     this.errorState.set(null);
     this.detailState.set(null);
+  }
+
+  private markChanged(): void {
+    this.revisionState.update((revision) => revision + 1);
   }
 
   /** Keeps the open details drawer in step when its card is edited or moved. */

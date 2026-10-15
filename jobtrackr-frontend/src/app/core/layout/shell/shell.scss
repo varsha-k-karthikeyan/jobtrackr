@@ -2,3 +2,8 @@
 .app-header {
   background: var(--mat-sys-surface);
 }
+
+// Overdue follow-ups in the bell menu, in the theme's error colour (on a plain span, not a Material element)
+.follow-up-overdue {
+  color: var(--mat-sys-error);
+}

@@ -8,6 +8,70 @@
 
     <span class="flex-1"></span>
 
+    <!-- Follow-up reminders. Opening the menu refreshes the list (the date may have rolled over). -->
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="notificationMenu"
+      (menuOpened)="refreshNotifications()"
+      [attr.aria-label]="notificationsLabel()"
+    >
+      <mat-icon
+        [matBadge]="dueCount()"
+        [matBadgeHidden]="dueCount() === 0"
+        aria-hidden="false"
+        >notifications</mat-icon
+      >
+    </button>
+    <mat-menu #notificationMenu="matMenu" xPosition="before">
+      <!-- stopPropagation: a click on the panel would otherwise close the menu -->
+      <div class="flex min-h-12 items-center justify-between gap-2 pl-4 pr-2" (click)="$event.stopPropagation()">
+        <span class="text-sm font-semibold">Follow-ups</span>
+        @if (due().length > 1) {
+          <button mat-button (click)="dismissAll()">Dismiss all</button>
+        }
+      </div>
+      <mat-divider />
+
+      @if (due().length === 0 && upcoming().length === 0) {
+        <p class="m-0 px-4 py-3 text-sm opacity-70">No follow-ups in the next 7 days.</p>
+      }
+
+      @for (item of due(); track item.applicationId) {
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center pr-1">
+          <button mat-menu-item (click)="openApplication(item.applicationId)">
+            <!-- Fixed width: Material's text wrapper will not shrink, so truncate needs an explicit width.
+                 w-52 = the 280px menu panel minus the dismiss button and the item padding. -->
+            <span class="block w-52">
+              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
+              <!-- The due label gets its own line, so a long role can never push it out of view -->
+              <span class="block text-xs" [class.follow-up-overdue]="item.daysUntilDue < 0">{{ label(item.daysUntilDue) }}</span>
+            </span>
+          </button>
+          <button
+            mat-icon-button
+            (click)="$event.stopPropagation(); dismiss(item.applicationId)"
+            [attr.aria-label]="'Dismiss follow-up for ' + item.company"
+          >
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+
+      @if (upcoming().length > 0) {
+        <mat-divider />
+        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Upcoming</div>
+        @for (item of upcoming(); track item.applicationId) {
+          <button mat-menu-item (click)="openApplication(item.applicationId)">
+            <!-- No dismiss button here, so the text can use the full panel width (280px minus padding) -->
+            <span class="block w-60">
+              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
+              <span class="block text-xs opacity-70">{{ label(item.daysUntilDue) }}</span>
+            </span>
+          </button>
+        }
+      }
+    </mat-menu>
+
     <!-- Name next to the icon on wider screens; the icon alone on phones -->
     <span class="mr-1 hidden max-w-48 truncate text-sm sm:inline">{{ displayName() }}</span>
     <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">

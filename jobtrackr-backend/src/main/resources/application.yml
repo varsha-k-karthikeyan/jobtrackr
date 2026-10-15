@@ -41,7 +41,11 @@ jobtrackr:
     # HS256 signing key from the environment (min 32 characters); never committed.
     # No default on purpose: the app refuses to start without it. Changing it invalidates every issued token.
     secret: ${JWT_SECRET}
-    access-token-ttl: 15m  # how long an access token is valid; there are no refresh tokens yet
+    access-token-ttl: 15m  # short on purpose: the frontend renews it with the refresh token
+    refresh-token-ttl: 14d # how long a session survives without any use; rotated on every refresh
+    # The refresh cookie's Secure flag. Browsers only send Secure cookies over HTTPS, so it stays false
+    # for http://localhost; set REFRESH_COOKIE_SECURE=true wherever the API runs on HTTPS.
+    refresh-cookie-secure: ${REFRESH_COOKIE_SECURE:false}
   cors:
     # Browser origins allowed to call the API, bound to common/config/CorsProperties.java.
     # Comma-separated; add the deployed frontend URL through the environment, e.g.

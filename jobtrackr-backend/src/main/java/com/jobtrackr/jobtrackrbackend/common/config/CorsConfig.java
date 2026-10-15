@@ -26,8 +26,10 @@ public class CorsConfig {
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         // Without this the browser hides the Location header of a 201 from JavaScript
         configuration.setExposedHeaders(List.of("Location"));
-        // The token travels in a header, not a cookie, so credentialed CORS is not needed
-        configuration.setAllowCredentials(false);
+        // Needed for the refresh-token cookie: without it the browser neither stores the cookie from a
+        // cross-origin response nor sends it back. Allowed because the origins are an explicit list
+        // (credentials can never be combined with "*"). The access token still travels in a header.
+        configuration.setAllowCredentials(true);
         // Browsers may cache a successful preflight for this long instead of repeating it before every call
         configuration.setMaxAge(Duration.ofHours(1));
 

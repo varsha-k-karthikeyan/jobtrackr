@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
 import com.jayway.jsonpath.JsonPath;
+import jakarta.servlet.http.Cookie;
 import com.jobtrackr.jobtrackrbackend.auth.dto.PasswordPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,11 +17,14 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -152,6 +156,72 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void login_setsAnHttpOnlyStrictRefreshCookieScopedToAuth() throws Exception {
+        register(email);
+
+        String setCookie = mockMvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
+
+        assertThat(setCookie)
+                .startsWith(RefreshTokenCookie.NAME + "=")
+                .contains("HttpOnly", "SameSite=Strict", "Path=/api/v1/auth", "Max-Age=1209600");
+        // The refresh token must never appear in the JSON body
+        assertThat(refreshTokenIn(setCookie)).hasSizeGreaterThanOrEqualTo(43);
+    }
+
+    @Test
+    void refresh_rotatesTheCookie_returnsAWorkingAccessToken_andRejectsTheOldCookie() throws Exception {
+        String firstCookie = refreshTokenIn(mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, PASSWORD)))
+                .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE));
+
+        var refreshed = mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, firstCookie)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andReturn().getResponse();
+        String secondCookie = refreshTokenIn(refreshed.getHeader(HttpHeaders.SET_COOKIE));
+        assertThat(secondCookie).isNotEqualTo(firstCookie);
+
+        String newAccessToken = accessToken(refreshed.getContentAsString());
+        mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + newAccessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
+
+        // The first cookie was used up by the rotation: 401, and the response deletes the cookie
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, firstCookie)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        // The second one still works
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, secondCookie)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void refresh_withoutCookie_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Your session has expired. Please log in again."));
+    }
+
+    @Test
+    void logout_revokesTheRefreshTokenAndDeletesTheCookie() throws Exception {
+        String cookie = refreshTokenIn(mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(credentials(email, PASSWORD)))
+                .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE));
+
+        mockMvc.perform(post("/api/v1/auth/logout").cookie(new Cookie(RefreshTokenCookie.NAME, cookie)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+        mockMvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie(RefreshTokenCookie.NAME, cookie)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void swaggerDocs_arePublic() throws Exception {
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
@@ -170,6 +240,12 @@ class AuthApiIntegrationTest {
                         .content(credentials(loginEmail, password)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
+    }
+
+    /** The token value out of a Set-Cookie header: "jobtrackr_refresh=<value>; Path=...". */
+    private static String refreshTokenIn(String setCookieHeader) {
+        assertThat(setCookieHeader).isNotNull();
+        return setCookieHeader.substring(setCookieHeader.indexOf('=') + 1, setCookieHeader.indexOf(';'));
     }
 
     private static String accessToken(String responseBody) {

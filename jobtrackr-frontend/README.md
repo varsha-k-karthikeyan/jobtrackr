@@ -72,6 +72,8 @@ component ──calls──▶ ApplicationStore ──▶ ApplicationApiService 
 - `src/styles.scss`: the Angular Material 3 theme (azure/violet, Inter) and a few app-wide classes (`.app-error-banner`, `.status-badge`, ...).
 - `src/tailwind.css`: Tailwind CSS v4, plain CSS on purpose (Tailwind v4 is not meant to run through Sass).
 
+**Password fields** use our own show/hide toggle. Microsoft Edge adds a second, built-in eye to every password input; `styles.scss` hides it with `input::-ms-reveal { display: none; }`, so keep that rule.
+
 **Form fields** are stacked with `gap-4` (16px) on their wrapper element. An outlined field's floating label sits on its top border, a few pixels above the field's box, so with less space a validation error or hint under one field runs into the label of the next. Keep hints short enough for one line.
 
 Tailwind sits in cascade layers and Material does not, so Material always wins on its own components. Use Tailwind for layout around Material widgets (put utilities on a plain wrapper element), and colour custom pieces with Material's `--mat-sys-*` variables or `mat.*-overrides` mixins.

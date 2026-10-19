@@ -38,6 +38,13 @@ body {
 // Small app-wide pieces that need theme colours. Kept here (not in Tailwind) so they read the
 // Material system variables and follow the theme automatically.
 
+// Microsoft Edge adds its own "reveal password" eye to every password input. Our fields already have a
+// show/hide toggle that works in all browsers, so hide Edge's to avoid two eye icons side by side.
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 // Inline error message box: forms, failed page loads
 .app-error-banner {
   padding: 0.75rem 1rem;

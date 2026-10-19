@@ -10,5 +10,11 @@ services:                                   # list of containers Compose will ru
     volumes:                                # persistent storage for this container
       - pgdata:/var/lib/postgresql/data     # mount named volume 'pgdata' at Postgres's data folder
 
+  mailpit:                                  # local mail catcher: accepts every email the backend sends and keeps it
+    image: 'axllent/mailpit:v1.27'          # nothing is ever delivered to a real inbox; no account needed
+    ports:
+      - '1025:1025'                         # SMTP: the backend sends here (spring.mail.host/port)
+      - '8025:8025'                         # web inbox: open http://localhost:8025 to read the emails
+
 volumes:                                    # top-level declaration of named volumes
   pgdata:                                   # create/manage a volume called 'pgdata' with default settings

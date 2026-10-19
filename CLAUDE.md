@@ -10,6 +10,7 @@ The owner is a senior Angular developer learning Spring Boot. After each piece o
 - `docs/DEBUGGING.md`: symptom-to-fix tables for startup failures, status codes, positions and tests.
 - `CONTRIBUTING.md`: commit format and step-by-step recipes (add a column, an endpoint, a feature).
 - `jobtrackr-frontend/README.md`: frontend structure, state flow and conventions.
+- `.github/workflows/ci.yml`: CI on every push and pull request to main (backend verify, frontend tests and build, both Docker images, commitlint on PRs). A change that breaks it is not done.
 
 Keep these in step with the code: a change to behaviour, configuration or structure updates the matching document in the same commit.
 
@@ -110,6 +111,7 @@ docker compose --profile full up --build
 - Docker: plain `docker compose up -d` starts only PostgreSQL and Mailpit (the dev setup); backend and frontend are under the `full` profile. Compose reads every variable in the file even for services it will not start, so required variables use `${NAME:-}` (empty default), never `${NAME:?}`, which would break plain `up -d`.
 - The frontend image's production `apiBaseUrl` is the relative `/api/v1`: nginx (`jobtrackr-frontend/nginx.conf`) proxies `/api/` to the backend. `ng serve` keeps the absolute `http://localhost:8080/api/v1` from `environment.development.ts`.
 - Only `/actuator/health` (and `/health/liveness`, `/health/readiness`) is public, without details; the mail health indicator is off so a missing SMTP server cannot mark the app DOWN.
+- CI runs on Linux: `jobtrackr-backend/mvnw` must keep its executable bit in git (`git update-index --chmod=+x`) and LF line endings (`jobtrackr-backend/.gitattributes`); `.gitattributes` at the root keeps the husky hook LF too. Windows does not track either by itself.
 - Scheduled jobs (`ExpiredTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.

@@ -1,5 +1,7 @@
 # JobTrackr
 
+[![CI](https://github.com/varsha-k-karthikeyan/jobtrackr/actions/workflows/ci.yml/badge.svg)](https://github.com/varsha-k-karthikeyan/jobtrackr/actions/workflows/ci.yml)
+
 A job application tracker: a Kanban board for your applications (Applied, Interview, Offer, Rejected), notes per application, follow-up dates with in-app reminders, and a searchable list.
 
 This is a monorepo with the Spring Boot backend and the Angular frontend side by side.
@@ -118,6 +120,8 @@ cd "E:\JobTrackr project\jobtrackr-backend"
 Docker Desktop must be running, but the compose database is **not** needed: the integration tests start their own throwaway PostgreSQL 16 with [Testcontainers](https://testcontainers.com/) on a random port (the first run downloads the image). Integration tests run inside transactions that are rolled back, so they leave no data behind. Tests use their own dummy JWT secret and need no environment variable, and background jobs are switched off during tests.
 
 `verify` also writes a coverage report to `jobtrackr-backend/target/site/jacoco/index.html` (open it in a browser: `start target\site\jacoco\index.html`).
+
+Every push and pull request to `main` runs the same checks on GitHub Actions (`.github/workflows/ci.yml`): backend `mvnw verify`, frontend tests and production build, both Docker images, and commit messages on pull requests.
 
 Frontend unit tests (Vitest) need neither the backend nor the database:
 

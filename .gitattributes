@@ -1,0 +1,5 @@
+# Line endings that must survive a Windows checkout (core.autocrlf=true converts text files to CRLF).
+# Shell scripts run by sh need LF: a trailing \r breaks them ("sh^M: not found").
+# (jobtrackr-backend/.gitattributes already does the same for the Maven wrapper.)
+.husky/* text eol=lf
+*.sh     text eol=lf

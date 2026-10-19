@@ -104,6 +104,8 @@ cmd /c "echo feat(auth): add refresh tokens| npx commitlint"
 
 No output means the message is valid.
 
+CI checks the messages again on every pull request (the `commitlint` job in `.github/workflows/ci.yml`), with the same rules, so a commit made with `--no-verify` is still caught.
+
 ## Code rules
 
 The short version; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the reasons.

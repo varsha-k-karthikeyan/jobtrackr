@@ -237,6 +237,21 @@ Useful tools: the Angular DevTools browser extension (component tree and signal 
 | Changes do not show up | The images were built before the change | Add `--build` to `up` |
 | Backend restarts with `OutOfMemoryError` | The 512 MB limit is too small for something new | Check with `docker stats`; `ExitOnOutOfMemoryError` makes the restart deliberate |
 
-## 11. The commit is rejected
+## 11. CI fails (GitHub Actions)
+
+Open the failed run in the repository's **Actions** tab; each job's log shows the failing step. The backend job also uploads `surefire-reports` and `jacoco-report` as artifacts (bottom of the run page).
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `./mvnw: Permission denied` | The wrapper lost its executable bit (Windows does not track it) | `git update-index --chmod=+x jobtrackr-backend/mvnw`, commit |
+| `/bin/sh^M` or `\r: command not found` | A shell script was committed with CRLF line endings | Covered by `.gitattributes`; run `git add --renormalize .` and commit |
+| Backend tests pass locally, fail in CI with a time or zone difference | The runner is UTC; the code must not depend on the machine's zone | Use the injected `Clock` and an explicit zone, as `NotificationService` does |
+| `npm ci` fails: lock file out of sync | `package.json` changed without `package-lock.json` | Run `npm install` locally and commit the lock file |
+| Frontend job: Node engine error | Angular 22 needs Node ^22.22.3, ^24.15.0 or >=26; CI uses 24 | Keep `node-version` in `ci.yml` within that range |
+| Backend job: Java version error | CI uses Temurin 21 like the Dockerfile and `<java.version>` | Change all three together |
+| `commitlint` job fails on a PR | A commit message breaks the rules | Reword it (`git rebase -i`, reword) and force-push the branch |
+| Docker job fails but the other jobs pass | A Dockerfile step depends on a file `.dockerignore` excludes, or on a local file | Build locally from a fresh clone: `docker build jobtrackr-backend` |
+
+## 12. The commit is rejected
 
 `git commit` prints `✖ ... [type-enum]` or similar: the message does not follow the format. See [CONTRIBUTING.md](../CONTRIBUTING.md). If no check runs at all, the hook is not installed: run `npm install` in the monorepo root.

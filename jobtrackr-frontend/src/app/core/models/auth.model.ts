@@ -25,6 +25,17 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+/** POST /auth/forgot-password. Always answered with 204, registered address or not. */
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+/** POST /auth/reset-password. `token` comes from the emailed link. Answered with 204; then log in. */
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
 /** GET /me (UserResponse). */
 export interface User {
   id: number;

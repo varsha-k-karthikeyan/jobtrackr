@@ -34,7 +34,6 @@ type SignInSource = 'form' | 'demo';
     MatProgressSpinnerModule,
   ],
   templateUrl: './login-page.html',
-  styleUrl: './login-page.scss',
 })
 export class LoginPage {
   private readonly auth = inject(AuthService);
@@ -43,6 +42,8 @@ export class LoginPage {
 
   /** ?returnUrl=... set by the auth guard; bound by withComponentInputBinding(). */
   readonly returnUrl = input<string | null>(null);
+  /** ?reset=done after a successful password reset: shows a confirmation above the form. */
+  readonly reset = input<string | null>(null);
 
   protected readonly form = inject(NonNullableFormBuilder).group({
     email: ['', [Validators.required, Validators.email]],

@@ -5,4 +5,6 @@ export const environment = {
   production: true,
   // Set to the deployed backend's URL when the app is hosted
   apiBaseUrl: 'http://localhost:8080/api/v1',
+  // Development only: a hosted build sends real email, so there is no local inbox to point at
+  mailInboxUrl: null as string | null,
 };

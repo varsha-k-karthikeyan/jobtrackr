@@ -15,6 +15,10 @@
 
           @if (serverError(); as message) {
             <div class="app-error-banner" role="alert">{{ message }}</div>
+          } @else if (reset() === 'done') {
+            <div class="app-success-banner" role="status">
+              Your password has been changed. Log in with your new password.
+            </div>
           }
 
           <!-- gap-4: room for a field's error line AND the next field's floating label (which sits above its box) -->
@@ -52,6 +56,10 @@
                 <mat-error>At least 8 characters</mat-error>
               }
             </mat-form-field>
+
+            <div class="-mt-2 flex justify-end">
+              <a routerLink="/forgot-password" class="app-link text-sm">Forgot password?</a>
+            </div>
 
             <button mat-flat-button type="submit" class="mt-2" [disabled]="submitting() !== null">
               <span class="inline-flex items-center gap-2">

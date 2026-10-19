@@ -3,7 +3,15 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, finalize, firstValueFrom, map, Observable, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, ChangePasswordRequest, LoginRequest, RegisterRequest, User } from '../models/auth.model';
+import {
+  AuthResponse,
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  LoginRequest,
+  RegisterRequest,
+  ResetPasswordRequest,
+  User,
+} from '../models/auth.model';
 import { SKIP_ERROR_TOAST } from '../interceptors/error-interceptor';
 import { clearStoredToken, hasSessionHint, readStoredToken, storeToken, TOKEN_KEY } from './token-storage';
 
@@ -70,6 +78,16 @@ export class AuthService {
           this.tokenState.set(response.accessToken);
         }),
       );
+  }
+
+  /** Asks for a reset link. The backend answers 204 whether or not the address is registered. */
+  forgotPassword(request: ForgotPasswordRequest): Observable<void> {
+    return this.http.post<void>(`${this.authUrl}/forgot-password`, request, { context: skipToast() });
+  }
+
+  /** Sets a new password from an emailed link. No session starts: the user logs in afterwards. */
+  resetPassword(request: ResetPasswordRequest): Observable<void> {
+    return this.http.post<void>(`${this.authUrl}/reset-password`, request, { context: skipToast() });
   }
 
   loadMe(context?: HttpContext): Observable<User> {

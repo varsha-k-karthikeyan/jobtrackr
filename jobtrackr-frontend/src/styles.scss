@@ -56,6 +56,15 @@ body {
   font: var(--mat-sys-body-medium);
 }
 
+// Inline confirmation box: e.g. "your password has been changed"
+.app-success-banner {
+  padding: 0.75rem 1rem;
+  border-radius: var(--mat-sys-corner-medium);
+  background: var(--app-success-container);
+  color: var(--app-on-success-container);
+  font: var(--mat-sys-body-medium);
+}
+
 // Right-hand drawer built from MatDialog (details panel): square edges, full height
 .app-drawer-panel {
   @include mat.dialog-overrides((

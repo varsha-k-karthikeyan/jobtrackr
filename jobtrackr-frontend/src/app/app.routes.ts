@@ -1,8 +1,9 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth-guards';
 
-// Every page is lazy-loaded. /login and /register render without the shell (no toolbar) and only for
-// signed-out users; /board and /list render inside the shell and only for signed-in users.
+// Every page is lazy-loaded. /login, /register and /forgot-password render without the shell (no toolbar)
+// and only for signed-out users; /reset-password renders without the shell for anyone; /board and /list
+// render inside the shell and only for signed-in users.
 export const routes: Routes = [
   {
     path: 'login',
@@ -16,6 +17,20 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () =>
       import('./features/auth/register-page/register-page').then((m) => m.RegisterPage),
+  },
+  {
+    path: 'forgot-password',
+    title: 'Forgot password · JobTrackr',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/forgot-password-page/forgot-password-page').then((m) => m.ForgotPasswordPage),
+  },
+  {
+    // The emailed link. No guard on purpose: it must work even in a browser that is still signed in
+    path: 'reset-password',
+    title: 'Reset password · JobTrackr',
+    loadComponent: () =>
+      import('./features/auth/reset-password-page/reset-password-page').then((m) => m.ResetPasswordPage),
   },
   {
     path: '',

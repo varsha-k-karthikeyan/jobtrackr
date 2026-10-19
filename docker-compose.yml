@@ -1,3 +1,13 @@
+# Two ways to use this file (from the monorepo root):
+#
+#   docker compose up -d                       -> PostgreSQL + Mailpit only: the everyday development setup
+#                                                 (backend via mvnw, frontend via npm start)
+#   docker compose --profile full up --build   -> everything in containers: also the backend (:8080, Swagger)
+#                                                 and the frontend (http://localhost:4200)
+#
+# Settings come from environment variables, which Compose also reads from a git-ignored .env file next to
+# this one (copy .env.example). The full stack needs JWT_SECRET there; everything else has a local default.
+
 services:                                   # list of containers Compose will run
   postgres:                                 # service name (also its hostname on the Docker network)
     image: 'postgres:16'                    # official Postgres image, pinned to major version 16
@@ -6,15 +16,59 @@ services:                                   # list of containers Compose will ru
       - 'POSTGRES_PASSWORD=jobtrackr'       # password for the DB user (fine for local dev only)
       - 'POSTGRES_USER=jobtrackr'           # DB user created on first run
     ports:                                  # expose container ports to your machine
-      - '5432:5432'                         # host port : container port (Spring Boot connects to localhost:5432)
+      # host port : container port. Spring Boot run from mvnw connects to localhost:5432. If a local PostgreSQL
+      # service already owns 5432, set POSTGRES_HOST_PORT (e.g. 5433) instead of stopping that service; the
+      # containerised backend is unaffected because it reaches the database inside Docker's network.
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
     volumes:                                # persistent storage for this container
       - pgdata:/var/lib/postgresql/data     # mount named volume 'pgdata' at Postgres's data folder
+    healthcheck:                            # "healthy" once it accepts connections; the backend waits for that
+      test: ['CMD-SHELL', 'pg_isready -U jobtrackr -d jobtrackr']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mailpit:                                  # local mail catcher: accepts every email the backend sends and keeps it
     image: 'axllent/mailpit:v1.27'          # nothing is ever delivered to a real inbox; no account needed
     ports:
       - '1025:1025'                         # SMTP: the backend sends here (spring.mail.host/port)
       - '8025:8025'                         # web inbox: open http://localhost:8025 to read the emails
+
+  backend:                                  # Spring Boot API, only with --profile full
+    profiles: ['full']
+    build: ./jobtrackr-backend
+    environment:
+      # Spring Boot binds these environment variables to spring.datasource.* with no code change
+      SPRING_DATASOURCE_URL: 'jdbc:postgresql://postgres:5432/jobtrackr'
+      SPRING_DATASOURCE_USERNAME: 'jobtrackr'
+      SPRING_DATASOURCE_PASSWORD: 'jobtrackr'
+      # Deliberately no fallback value: without it the backend refuses to start and says why.
+      # (":-" rather than ":?" so that plain `docker compose up -d` still works without it.)
+      JWT_SECRET: '${JWT_SECRET:-}'
+      MAIL_HOST: 'mailpit'
+      MAIL_PORT: '1025'
+      APP_URL: '${APP_URL:-http://localhost:4200}'
+      REFRESH_COOKIE_SECURE: '${REFRESH_COOKIE_SECURE:-false}'
+      CORS_ALLOWED_ORIGINS: '${CORS_ALLOWED_ORIGINS:-http://localhost:4200}'
+    ports:
+      - '8080:8080'                         # direct access for Swagger UI; the app itself goes through the frontend
+    mem_limit: 512m                         # the same budget as a free hosting tier, to catch memory problems early
+    depends_on:
+      postgres:
+        condition: service_healthy          # start only once the database accepts connections
+      mailpit:
+        condition: service_started
+
+  frontend:                                 # nginx serving the Angular build and proxying /api/ to the backend
+    profiles: ['full']
+    build: ./jobtrackr-frontend
+    environment:
+      BACKEND_URL: 'http://backend:8080'
+    ports:
+      - '4200:80'                           # http://localhost:4200, the same address as `npm start`
+    depends_on:
+      backend:
+        condition: service_healthy          # the Dockerfile HEALTHCHECK on /actuator/health
 
 volumes:                                    # top-level declaration of named volumes
   pgdata:                                   # create/manage a volume called 'pgdata' with default settings

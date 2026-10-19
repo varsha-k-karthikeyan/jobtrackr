@@ -107,7 +107,14 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 
 ## Configuration
 
-`src/environments/environment.development.ts` (used by `ng serve`) and `environment.ts` (production build) hold `apiBaseUrl` and `mailInboxUrl` (the local Mailpit inbox in development, `null` in production). Everything in them ships to the browser, so no secrets.
+`src/environments/environment.development.ts` (used by `ng serve`) and `environment.ts` (production build) hold `apiBaseUrl` and `mailInboxUrl` (the local Mailpit inbox in development, `null` in production).
+
+- Development: `apiBaseUrl` is `http://localhost:8080/api/v1` (another origin, so CORS and `withCredentials` apply).
+- Production: `apiBaseUrl` is the **relative** `/api/v1`. Whatever serves the app forwards `/api/` to the backend: nginx in the Docker image (`nginx.conf`), or a hosting platform's rewrite rules. The browser then sees one origin, so the `SameSite=Strict` refresh cookie is first-party.
+
+## Docker image
+
+`Dockerfile`: Node 24 runs `npm ci` and the production build; nginx 1.30 serves `dist/jobtrackr-frontend/browser`. `nginx.conf` (a template: `BACKEND_URL` is filled in at container start) does the SPA fallback to `index.html`, gzip, a one-year `immutable` cache for the content-hashed JS and CSS and `no-cache` for `index.html`, and proxies `/api/`. It listens on IPv4 and IPv6, because the health check's `localhost` resolves to `::1` inside the container. Everything in them ships to the browser, so no secrets.
 
 ## Tests
 

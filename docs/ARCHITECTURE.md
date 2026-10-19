@@ -197,7 +197,7 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 | Change password (`PUT /api/v1/me/password`): check the current password, store the new BCrypt hash, end every session, start a fresh one for this browser | `AuthService.changePassword`, `PasswordController` |
 
 - The signing key comes from the `JWT_SECRET` environment variable through `JwtProperties`. HS256 is symmetric: the same key signs and verifies.
-- Public paths: `/api/v1/auth/**` and the Swagger paths. Everything else, including `/actuator/**`, needs a token.
+- Public paths: `/api/v1/auth/**`, the Swagger paths, and `/actuator/health` with its `/liveness` and `/readiness` probes. Everything else, including every other `/actuator/**` path, needs a token. Health is safe to open: it shows only `{"status":"UP"}` (details `never`), and no other actuator endpoint is even exposed over HTTP (`ActuatorSecurityIntegrationTest`).
 - **Two tokens.** The access token is a 15-minute JWT sent as `Authorization: Bearer`; it is stateless, so the API never looks it up. The refresh token is a random, opaque 256-bit value that lasts 14 days and lives only in an **httpOnly cookie** (`jobtrackr_refresh`, `SameSite=Strict`, `Path=/api/v1/auth`). JavaScript cannot read it, so an XSS bug can steal at most a token that expires within minutes.
 - **Stored as a hash.** `refresh_tokens` (V5) keeps only the SHA-256 of each refresh token. A fast hash is right here (unlike passwords, which need BCrypt): the token has 256 bits of entropy, so there is nothing to brute-force, and a deterministic hash lets the row be found by it.
 - **`POST /api/v1/auth/refresh`** (no body; the browser sends the cookie) rotates: it revokes the presented token, issues a new one in a new cookie, and returns a new access token. The row is read with `SELECT ... FOR UPDATE`, so two simultaneous refreshes with the same token are serialised.
@@ -285,6 +285,10 @@ All in `src/main/resources/application.yml`.
 | `spring.jpa.open-in-view` | `false` | All database access happens inside the service transaction |
 | `spring.data.web.pageable.max-page-size` | `100` | Upper limit for `?size=` |
 | `spring.docker.compose.enabled` | `false` | Docker is started by hand |
+| `server.port` | `${PORT:8080}` | Hosting platforms and containers pass the port in through `PORT` |
+| `management.endpoints.web.exposure.include` | `health` | Nothing else from Actuator is reachable over HTTP |
+| `management.endpoint.health.show-details` / `.probes.enabled` | `never`, `true` | Public health answers only UP/DOWN; adds `/actuator/health/liveness` and `/readiness` |
+| `management.health.mail.enabled` | `false` | An unreachable SMTP server must not turn the whole app DOWN (a failed reset email is logged instead) |
 | `jobtrackr.jwt.secret` | `${JWT_SECRET}` | Required, at least 32 characters. Locally from `jobtrackr-backend/.env.properties` (git-ignored, pulled in by `spring.config.import`); a real environment variable overrides it |
 | `jobtrackr.jwt.access-token-ttl` | `15m` | Access token lifetime; short because the frontend renews it silently |
 | `jobtrackr.jwt.refresh-token-ttl` | `14d` | How long a session survives without use; rotated on every refresh |
@@ -318,3 +322,25 @@ Integration tests are `@Transactional` and roll back, and each one creates its o
 The exception to "roll back": `PasswordResetApiIntegrationTest` is **not** `@Transactional`, because the reset email is sent only after commit, and a rolled-back test transaction never commits. It writes for real and deletes its own user in `@AfterEach` (the cascade removes its tokens), and waits for the asynchronous send with `verify(mailer, timeout(...))`.
 
 Every service method has a unit test. Keep it that way.
+
+## 16. Containers
+
+`docker compose up -d` starts PostgreSQL and Mailpit for development. `docker compose --profile full up --build` adds the two application images:
+
+```mermaid
+flowchart LR
+    browser[Browser] -->|":4200 one origin"| nginx["frontend: nginx 1.30<br/>Angular build + /api/ proxy"]
+    nginx -->|"/api/ to backend:8080"| api["backend: Spring Boot on JRE 21<br/>non-root, 512 MB"]
+    api -->|"postgres:5432"| db[("PostgreSQL 16")]
+    api -->|"mailpit:1025"| mail["Mailpit"]
+```
+
+**Backend image** (`jobtrackr-backend/Dockerfile`):
+- Two stages: `eclipse-temurin:21-jdk-alpine` builds with the Maven wrapper (dependencies in their own cached layer; `-DskipTests` because CI runs `verify` and a build has no Docker for Testcontainers), `eclipse-temurin:21-jre-alpine` runs it.
+- `java -Djarmode=tools -jar application.jar extract --layers` splits the jar into Spring Boot's layers (dependencies, loader, snapshot dependencies, application), copied in that order so a code change rebuilds only the last one. Boot 4 removed the older `layertools` mode.
+- Runs as an unprivileged `jobtrackr` user. `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError` sizes the heap from the container limit, not the host's RAM; compose sets `mem_limit: 512m` (measured: about 300 MiB used, started in about 9 seconds). `PORT` defaults to 8080. The JVM still forces UTC in `main`.
+- `HEALTHCHECK` calls `/actuator/health`; compose starts the frontend only once it is healthy, and the backend only once PostgreSQL answers `pg_isready`.
+
+**Frontend image** (`jobtrackr-frontend/Dockerfile`): Node 24 builds, nginx serves. The production `apiBaseUrl` is `/api/v1` and nginx proxies `/api/` to `BACKEND_URL`, so the browser sees ONE origin: the `SameSite=Strict`, `Path=/api/v1/auth` refresh cookie is first-party and CORS never comes into play. Details in the frontend README.
+
+**Configuration:** every value comes from environment variables, which Compose also reads from a git-ignored root `.env` (see `.env.example`). `JWT_SECRET` has no default anywhere; Compose passes it as `${JWT_SECRET:-}` (empty) rather than `${JWT_SECRET:?}`, because Compose interpolates every service even when a profile is off, and `:?` would break plain `docker compose up -d`. The empty value then makes the backend refuse to start with a clear message.

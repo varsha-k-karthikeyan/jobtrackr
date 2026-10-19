@@ -1,0 +1,11 @@
+# The image installs its own dependencies (npm ci) and builds from source; local output only slows the build
+node_modules/
+dist/
+.angular/
+coverage/
+out-tsc/
+.idea/
+.vscode/
+*.log
+.env
+.env.*

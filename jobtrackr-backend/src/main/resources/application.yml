@@ -1,5 +1,27 @@
 # Main configuration. Loaded for every run; src/test/resources/application-test.yml is layered on top in tests.
 # The only value that must come from outside is JWT_SECRET (see the bottom of this file).
+server:
+  # Hosting platforms (and containers) commonly hand the port in through PORT; 8080 when it is absent
+  port: ${PORT:8080}
+
+# Actuator: only the health endpoint is exposed over HTTP, and only it is public (SecurityConfig).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health          # explicit: nothing else (env, beans, metrics...) is reachable over HTTP
+  endpoint:
+    health:
+      show-details: never        # just {"status":"UP"}: no versions, disk, or database details to an outsider
+      probes:
+        enabled: true            # /actuator/health/liveness and /readiness, outside Kubernetes too
+  health:
+    mail:
+      # Without this, an unreachable SMTP server (no Mailpit, or no provider in production) would turn the
+      # whole health DOWN and make container health checks restart a perfectly working app.
+      # A failed reset email is already logged by PasswordResetEmailListener.
+      enabled: false
+
 spring:
   application:
     name: jobtrackr-backend

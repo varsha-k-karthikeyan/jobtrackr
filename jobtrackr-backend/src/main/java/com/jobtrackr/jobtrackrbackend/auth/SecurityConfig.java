@@ -25,10 +25,14 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
-    // Reachable without a token: the auth endpoints, plus the API docs so Swagger UI can load
+    // Reachable without a token: the auth endpoints, the API docs so Swagger UI can load, and the health
+    // check (plus its liveness/readiness probes) for container and platform health checks. Health answers
+    // only {"status":"UP"} (details stay at the default "never"); every other actuator endpoint is not
+    // exposed over HTTP at all and would still need a token if it were.
     private static final String[] PUBLIC_PATHS = {
             "/api/v1/auth/**",
-            "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
+            "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
+            "/actuator/health", "/actuator/health/**"
     };
 
     @Bean

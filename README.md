@@ -28,7 +28,21 @@ This is a monorepo with the Spring Boot backend and the Angular frontend side by
 - Docker Desktop
 - Node.js 22.22.3+ or 24.15+ (the Angular 22 frontend; the commit message hook also runs on it)
 
-## Quick start
+## Run everything in Docker
+
+The whole app (PostgreSQL, Mailpit, the Spring Boot API and the Angular app behind nginx) in containers. Needs only Docker Desktop.
+
+```powershell
+cd "E:\JobTrackr project"
+Copy-Item .env.example .env     # once; then put your own random JWT_SECRET in .env
+docker compose --profile full up --build
+```
+
+Open http://localhost:4200 and click **Try the demo**. Swagger UI is at http://localhost:8080/swagger-ui.html and emails at http://localhost:8025. Stop with `Ctrl+C`, or `docker compose --profile full down` (keeps the data).
+
+nginx serves the app and forwards `/api/` to the backend, so the browser talks to one origin: the refresh cookie is first-party and no CORS is involved. Plain `docker compose up -d` still starts only PostgreSQL and Mailpit, for development.
+
+## Quick start (development)
 
 Windows PowerShell. Quote the path because it contains a space.
 

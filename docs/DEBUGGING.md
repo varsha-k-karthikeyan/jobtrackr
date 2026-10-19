@@ -225,6 +225,18 @@ $part += '=' * ((4 - $part.Length % 4) % 4)
 
 Useful tools: the Angular DevTools browser extension (component tree and signal values), and DevTools > Network > right-click a request > **Block request URL** to rehearse failure paths.
 
-## 10. The commit is rejected
+## 10. Docker
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Backend container exits: `jobtrackr.jwt.secret`, `must be at least 32 characters` | `JWT_SECRET` is not set for Compose | Copy `.env.example` to `.env` at the monorepo root and set your own value |
+| `Bind for 0.0.0.0:5432 failed: port is already allocated` (or "Only one usage of each socket address") | A local PostgreSQL service owns 5432 | Set `POSTGRES_HOST_PORT=5433` in `.env`, or stop the service (`Stop-Service postgresql-x64-18`, use your version) |
+| `Bind for 0.0.0.0:8080 failed` | The backend is also running from `mvnw`/IntelliJ | Stop that one; both use 8080 |
+| Frontend stays `unhealthy` but the site works | The check uses `localhost`, which is `::1` inside the container; nginx must listen on IPv6 too | Keep `listen [::]:80;` in `nginx.conf` |
+| The app loads but every API call is 502 | nginx cannot reach `BACKEND_URL` (backend not started or unhealthy) | `docker compose --profile full ps`, then `docker compose logs backend` |
+| Changes do not show up | The images were built before the change | Add `--build` to `up` |
+| Backend restarts with `OutOfMemoryError` | The 512 MB limit is too small for something new | Check with `docker stats`; `ExitOnOutOfMemoryError` makes the restart deliberate |
+
+## 11. The commit is rejected
 
 `git commit` prints `✖ ... [type-enum]` or similar: the message does not follow the format. See [CONTRIBUTING.md](../CONTRIBUTING.md). If no check runs at all, the hook is not installed: run `npm install` in the monorepo root.

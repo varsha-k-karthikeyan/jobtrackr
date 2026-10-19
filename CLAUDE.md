@@ -52,6 +52,11 @@ npm install        # first time only (use npm.cmd if PowerShell blocks npm.ps1)
 npm start          # http://localhost:4200
 npm test           # unit tests (Vitest), watch mode; `npm run test:ci` runs once and exits
 npm run build      # production build; must stay under the 500 kB initial budget
+
+# 5. Everything in containers (PostgreSQL, Mailpit, backend :8080, frontend http://localhost:4200).
+#    Needs JWT_SECRET in a root .env file (copy .env.example). Stop the mvnw backend first: both use 8080.
+cd "E:\JobTrackr project"
+docker compose --profile full up --build
 ```
 
 - Demo login: `demo@jobtrackr.dev` / `Demo@1234` (or "Try the demo" on the login page)
@@ -102,6 +107,9 @@ npm run build      # production build; must stay under the 500 kB initial budget
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
 - Password-reset emails go to the Mailpit container (SMTP localhost:1025), which delivers nothing; read them at http://localhost:8025. If it is not running, the send fails with only a warning in the log (the request still answers 204). Tests mock `PasswordResetMailer` and never send.
 - Integration tests are annotated `@IntegrationTest` (Spring Boot test + "test" profile + the shared Testcontainers PostgreSQL). A plain `@SpringBootTest` would try localhost:5432 instead. Surefire's `argLine` must keep `@{argLine}` first, or JaCoCo's agent is dropped and coverage reads 0%.
+- Docker: plain `docker compose up -d` starts only PostgreSQL and Mailpit (the dev setup); backend and frontend are under the `full` profile. Compose reads every variable in the file even for services it will not start, so required variables use `${NAME:-}` (empty default), never `${NAME:?}`, which would break plain `up -d`.
+- The frontend image's production `apiBaseUrl` is the relative `/api/v1`: nginx (`jobtrackr-frontend/nginx.conf`) proxies `/api/` to the backend. `ng serve` keeps the absolute `http://localhost:8080/api/v1` from `environment.development.ts`.
+- Only `/actuator/health` (and `/health/liveness`, `/health/readiness`) is public, without details; the mail health indicator is off so a missing SMTP server cannot mark the app DOWN.
 - Scheduled jobs (`ExpiredTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.

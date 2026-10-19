@@ -1,0 +1,9 @@
+# Keep the build context small and secret-free: only pom.xml, the Maven wrapper and src/ are needed
+target/
+.idea/
+*.iml
+.vscode/
+# Local secrets must never be baked into an image
+.env
+.env.*
+*.log

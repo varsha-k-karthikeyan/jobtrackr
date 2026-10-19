@@ -347,7 +347,7 @@ flowchart LR
 
 ## 17. Deployment
 
-**Status: not deployed yet.** Everything below is prepared; choosing the hosts is the open step.
+**Status: not hosted, by decision.** The app runs locally (`docker compose --profile full up --build`). Everything below is prepared so that hosting it later is configuration, not code.
 
 What is ready:
 
@@ -368,3 +368,13 @@ Constraints any hosting choice must respect:
 - **Flyway needs a direct database connection.** Managed databases that put a pooler (PgBouncer in transaction mode) in front of PostgreSQL must give Flyway the direct, non-pooled URL; most require `sslmode=require` in the JDBC URL.
 - **Password-reset email needs a real SMTP provider** in production (`MAIL_*` variables). Without one, the request still answers 204 and the failure is only logged, so the feature should be configured or hidden before the URL is public.
 - **Demo data ages:** `V4__demo_user_data.sql` runs once, with dates relative to that day, so on a long-lived deployment the demo's follow-ups drift into the past.
+
+Free hosting options, as researched in October 2026 (free tiers change often; re-check before relying on them):
+
+| Need | Best fit found | Why, and the catch |
+|---|---|---|
+| Backend container | Render free web service | 512 MB RAM fits (about 300 MiB used). Sleeps after 15 minutes idle and needs about a minute to wake. Outgoing SMTP ports 25, 465 and 587 are blocked, so password-reset email would need an HTTP email API or the feature switched off. Google Cloud Run starts faster but needs a billing account |
+| PostgreSQL | Neon free plan | 1 GB, wakes on the first query, does not expire. Flyway must use the direct (not the pooled) connection URL, with `sslmode=require`. Render's free Postgres expires after 30 days; Supabase's free projects pause after a week without activity |
+| Static frontend + `/api/*` proxy | Vercel (Hobby) | An external rewrite keeps one origin for the cookie, and its 120-second proxy timeout covers the backend's cold start. Netlify's proxy gives up after 26 seconds, so the first request after the backend slept would fail |
+
+Keeping one origin (the host proxies `/api/*`) is the important design choice: the `SameSite=Strict` refresh cookie stays first-party and nothing in the security model changes. Serving the API from a separate site would instead need `SameSite=None; Secure`, an explicit CORS list and CSRF protection.

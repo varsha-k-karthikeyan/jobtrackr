@@ -4,7 +4,7 @@
 
 **A job application tracker with a drag-and-drop Kanban board, follow-up reminders and a searchable list, built with Angular 22, Spring Boot 4 and PostgreSQL.**
 
-**Live demo:** not deployed yet. Run it locally with Docker in two commands (see [Quick start](#quick-start)).
+**Live demo:** none; the app is not hosted, by choice. It runs locally with Docker in two commands (see [Quick start](#quick-start)).
 
 ## Screenshots
 
@@ -192,7 +192,7 @@ The data is created by the Flyway migration `V4__demo_user_data.sql` in your own
 
 ## What I'd do next
 
-- **Deploy it** on a free tier (in progress) and add the live link here.
+- **Host it** if it ever needs a public URL. The images, health check and configuration are ready, and the hosting options are compared in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#17-deployment).
 - **AI resume match**: score a resume against a job description and list matched and missing skills (the reason `jdText` is stored with each application).
 - **Email follow-up reminders** through an SMTP provider, alongside the in-app bell.
 - **A "log out everywhere" button**: reuse detection already revokes every session internally; it only needs an endpoint and a menu item.

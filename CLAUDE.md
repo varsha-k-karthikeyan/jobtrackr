@@ -50,7 +50,8 @@ cd "E:\JobTrackr project\jobtrackr-backend"
 cd "E:\JobTrackr project\jobtrackr-frontend"
 npm install        # first time only (use npm.cmd if PowerShell blocks npm.ps1)
 npm start          # http://localhost:4200
-npm test           # unit tests (Vitest)
+npm test           # unit tests (Vitest), watch mode; `npm run test:ci` runs once and exits
+npm run build      # production build; must stay under the 500 kB initial budget
 ```
 
 - Demo login: `demo@jobtrackr.dev` / `Demo@1234` (or "Try the demo" on the login page)

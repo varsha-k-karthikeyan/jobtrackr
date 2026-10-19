@@ -149,7 +149,7 @@ cd "E:\JobTrackr project\jobtrackr-backend"
 
 # If the frontend changed
 cd "E:\JobTrackr project\jobtrackr-frontend"
-npm test -- --watch=false
+npm run test:ci
 npm run build      # also checks the 500 kB initial bundle budget
 ```
 

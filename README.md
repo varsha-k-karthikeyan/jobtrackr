@@ -109,7 +109,7 @@ Frontend unit tests (Vitest) need neither the backend nor the database:
 
 ```powershell
 cd "E:\JobTrackr project\jobtrackr-frontend"
-npm test -- --watch=false
+npm run test:ci
 ```
 
 ## API at a glance

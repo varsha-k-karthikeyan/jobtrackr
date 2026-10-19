@@ -17,8 +17,9 @@ npm start        # ng serve on http://localhost:4200
 | Command | Purpose |
 |---|---|
 | `npm start` | Dev server with live reload |
-| `npm test` | Unit tests (Vitest), once with `npm test -- --watch=false` |
-| `npm run build` | Production build into `dist/` |
+| `npm test` | Unit tests (Vitest) in watch mode |
+| `npm run test:ci` | Unit tests once, then exit (what CI runs). Same as `npm test -- --watch=false`; without a terminal (TTY) the builder already defaults to a single run |
+| `npm run build` | Production build into `dist/` (the default configuration is `production`; it fails above 1 MB and warns above 500 kB for the initial bundle) |
 
 If PowerShell refuses `npm` ("running scripts is disabled"), use `npm.cmd`, or run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 
@@ -121,6 +122,9 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 | `core/interceptors/auth-interceptor.spec.ts` | Bearer only to our API, refresh + single retry on 401, one refresh for simultaneous 401s, no refresh loop, logout when the refresh fails |
 | `features/auth/reset-password-page/reset-password-page.spec.ts` | Token removed from the URL without a history entry, missing token, the exact request body, redirect with confirmation, used/expired link state |
 | `features/auth/forgot-password-page/forgot-password-page.spec.ts` | Email validation, the request body, the neutral confirmation |
+| `core/interceptors/error-interceptor.spec.ts` | One snackbar per failed request with the ProblemDetail text, `SKIP_ERROR_TOAST` honoured, 401 left to the auth interceptor, the error still reaches the caller, network failures explained |
+| `core/guards/auth-guards.spec.ts` | `safeReturnUrl` refuses external and protocol-relative URLs (no open redirect after login); `authGuard` and `guestGuard` decisions |
+| `core/api/problem-message.spec.ts`, `core/auth/token-storage.spec.ts` | Error text for every kind of failure; expired or unreadable tokens dropped, session hint set and cleared |
 | `shared/components/change-password-dialog/change-password-dialog.spec.ts` | Required and match rules, the exact request (credentials included), token stored on success, server field error and the demo 403 |
 | `shared/components/application-dialog/application-dialog.spec.ts` | Form validation (required, cross-field salary, limits), edit prefill, the exact request body |
 

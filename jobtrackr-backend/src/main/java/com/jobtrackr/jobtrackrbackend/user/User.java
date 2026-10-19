@@ -13,6 +13,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 // An account. Maps the "users" table ("user" is a reserved word in PostgreSQL, hence the plural).
 // email is stored lower-case (AuthService normalises it). passwordHash is a BCrypt hash and must never
@@ -36,6 +37,14 @@ public class User {
 
     @Column(name = "full_name", length = 120)
     private String fullName;
+
+    // The user's switch for all reminder emails (V12); true for new accounts, like the column default
+    @Column(name = "email_reminders_enabled", nullable = false)
+    private boolean emailRemindersEnabled = true;
+
+    // Day the morning reminder digest was handled (V11); written only by a bulk update in UserRepository
+    @Column(name = "digest_sent_on")
+    private LocalDate digestSentOn;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import {
   AuthResponse,
   ChangePasswordRequest,
+  EmailRemindersRequest,
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
@@ -88,6 +89,17 @@ export class AuthService {
   /** Sets a new password from an emailed link. No session starts: the user logs in afterwards. */
   resetPassword(request: ResetPasswordRequest): Observable<void> {
     return this.http.post<void>(`${this.authUrl}/reset-password`, request, { context: skipToast() });
+  }
+
+  /**
+   * Switches reminder emails on or off. The answer is the updated profile, which replaces the stored one, so
+   * the account menu shows the new state. Errors (the demo account's 403) get the usual snackbar.
+   */
+  setEmailReminders(enabled: boolean): Observable<User> {
+    const request: EmailRemindersRequest = { enabled };
+    return this.http
+      .put<User>(`${environment.apiBaseUrl}/me/email-reminders`, request)
+      .pipe(tap((user) => this.userState.set(user)));
   }
 
   loadMe(context?: HttpContext): Observable<User> {

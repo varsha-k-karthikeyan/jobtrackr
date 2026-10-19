@@ -6,7 +6,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { Application } from '../../../core/models/application.model';
-import { followUpState } from '../../../shared/utils/dates';
+import { dateToIsoDate, followUpState } from '../../../shared/utils/dates';
 import { formatSalary } from '../../../shared/utils/format';
 
 // One Kanban card. Presentational: it renders an Application and reports user intent through outputs;
@@ -30,5 +30,16 @@ export class ApplicationCard {
   protected readonly followUp = computed(() => {
     const date = this.application().followUpOn;
     return date ? { date, state: followUpState(date) } : null;
+  });
+
+  /** Today's or a future interview; null when none is scheduled or it is already in the past. */
+  protected readonly interview = computed(() => {
+    const at = this.application().interviewAt;
+    if (!at) {
+      return null;
+    }
+    const start = new Date(at);
+    const state = followUpState(dateToIsoDate(start));
+    return state === 'overdue' ? null : { start, isToday: state === 'today' };
   });
 }

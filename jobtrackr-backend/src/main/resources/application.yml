@@ -105,6 +105,15 @@ jobtrackr:
   token-cleanup:
     cron: ${TOKEN_CLEANUP_CRON:0 30 3 * * *}
     zone: Asia/Kolkata
+  # Reminder emails (notification/ReminderEmailProperties.java): a morning digest of due follow-ups and the
+  # day's interviews, and a reminder shortly before each interview. Times are in notifications.zone.
+  reminder-emails:
+    # Every minute, at second 0. The job itself decides what is due, so this is a check interval, not a send time.
+    cron: ${REMINDER_EMAILS_CRON:0 * * * * *}
+    digest-time: "08:00"
+    interview-lead-time: 30m
+    app-url: ${APP_URL:http://localhost:4200}
+    from: ${MAIL_FROM:JobTrackr <no-reply@jobtrackr.local>}
   # "Forgot password" emails (auth/PasswordResetProperties.java), validated at startup
   password-reset:
     # Base URL of the frontend for the link in the email. Always from config, never from the request's

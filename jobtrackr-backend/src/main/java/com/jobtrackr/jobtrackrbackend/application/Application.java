@@ -82,6 +82,15 @@ public class Application {
     @Column(name = "follow_up_on")
     private LocalDate followUpOn;
 
+    // Scheduled interview start, an exact instant (V10); null when none is scheduled
+    @Column(name = "interview_at")
+    private Instant interviewAt;
+
+    // The interviewAt the "starts soon" email was sent for (V11). Moving the interview makes the two differ,
+    // which re-arms the reminder. Internal bookkeeping like reminderDismissedOn: in no DTO.
+    @Column(name = "interview_reminder_sent_for")
+    private Instant interviewReminderSentFor;
+
     // Day the user dismissed the follow-up notification for the current followUpOn (null = not dismissed).
     // Internal bookkeeping for the notification feature: not part of any application request or response DTO.
     @Column(name = "reminder_dismissed_on")

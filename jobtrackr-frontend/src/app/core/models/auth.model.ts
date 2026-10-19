@@ -42,4 +42,11 @@ export interface User {
   email: string;
   fullName: string | null;
   createdAt: IsoInstant;
+  /** The switch for reminder emails (8:00 digest, interview starting soon). */
+  emailRemindersEnabled: boolean;
+}
+
+/** PUT /me/email-reminders. Answered with the updated User. */
+export interface EmailRemindersRequest {
+  enabled: boolean;
 }

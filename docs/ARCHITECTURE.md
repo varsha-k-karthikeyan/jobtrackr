@@ -17,7 +17,7 @@ jobtrackr-backend/
     │   │   ├── JobtrackrBackendApplication   entry point; sets the JVM to UTC
     │   │   ├── application/                  job applications = Kanban cards (the core feature)
     │   │   ├── note/                         notes attached to an application
-    │   │   ├── user/                         the account entity and GET /me
+    │   │   ├── user/                         the account entity, GET /me and the reminder-email switch
     │   │   ├── auth/                         register, login, JWT, security configuration
     │   │   ├── stats/                        counts per status and response rate (GET /stats)
     │   │   ├── notification/                 follow-up reminders for the bell in the header (GET /notifications)
@@ -90,7 +90,7 @@ Any exception thrown in the controller or below is converted to JSON by `common/
 
 ## 4. Data model
 
-Defined in `db/migration/V1__init.sql` and later migrations (V5 refresh tokens, V6/V7 the notification column; V8 dropped the `resumes` and `match_results` tables that V1 had reserved for an AI resume match, which was taken out of scope; V9 password-reset links). Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
+Defined in `db/migration/V1__init.sql` and later migrations (V5 refresh tokens, V6/V7 the notification column; V8 dropped the `resumes` and `match_results` tables that V1 had reserved for an AI resume match, which was taken out of scope; V9 password-reset links; V10 interview time; V11 reminder-email bookkeeping; V12 the reminder-email switch). Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
 
 ```mermaid
 erDiagram
@@ -102,8 +102,8 @@ erDiagram
 
 | Table | Java entity | Notes |
 |---|---|---|
-| `users` | `user/User` | `email` unique, stored lower-case. `password_hash` is BCrypt |
-| `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter. `reminder_dismissed_on` (V6, renamed in V7) is internal to the notification feature and in no DTO |
+| `users` | `user/User` | `email` unique, stored lower-case. `password_hash` is BCrypt. `digest_sent_on` (V11) is the day the morning reminder email was handled; `email_reminders_enabled` (V12, default true) is the user's switch for reminder emails (section 10) |
+| `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter. `reminder_dismissed_on` (V6, renamed in V7) is internal to the notification feature and in no DTO. `interview_at` (V10) is the scheduled interview as an exact instant (`TIMESTAMPTZ`, `Instant` in Java, ISO with `Z` in JSON); the frontend combines a date picker, a time combo box (type any 12-hour time such as "7:45", or pick a 30-minute step from the suggestions, which narrow as you type) and an AM/PM dropdown (AM by default) in the browser's zone, and a date without a time is refused, because it would silently mean midnight. `interview_reminder_sent_for` (V11) is internal to the reminder emails and in no DTO |
 | `notes` | `note/Note` | No `user_id`; the owner is the owner of the parent application |
 | `refresh_tokens` | `auth/RefreshToken` | Added by V5. Hash only, never the token. Rows expired over 7 days ago are deleted nightly (section 8) |
 | `password_reset_tokens` | `auth/PasswordResetToken` | Added by V9. Hash only. Unused emailed links: deleted on use, on a new request, or nightly once expired (section 8) |
@@ -126,7 +126,7 @@ This is the most important rule in the codebase.
 
 When adding a query, ask: "where is `user_id` in the WHERE clause?" If the answer is "nowhere", it is a bug.
 
-The deliberate exceptions have no logged-in user by nature: `RefreshTokenRepository.deleteExpiredBefore` and `PasswordResetTokenRepository.deleteExpiredBefore`, called only by the nightly cleanup job (an expired row is useless to everyone), and the password-reset flow, which runs before anyone is signed in and identifies the user by the email address (request) or by the hashed token (reset) instead of `CurrentUserProvider`.
+The deliberate exceptions have no logged-in user by nature: `RefreshTokenRepository.deleteExpiredBefore` and `PasswordResetTokenRepository.deleteExpiredBefore`, called only by the nightly cleanup job (an expired row is useless to everyone); the reminder-email queries (`ApplicationRepository.findInterviewsDueForReminder`, `UserRepository.findDueForDigest` and their "mark as sent" updates), called only by `ReminderEmailJob`, which works for every user and sends each email to the owner of the row; and the password-reset flow, which runs before anyone is signed in and identifies the user by the email address (request) or by the hashed token (reset) instead of `CurrentUserProvider`.
 
 ## 6. Card ordering and the move algorithm
 
@@ -227,7 +227,7 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 
 ## 10. Follow-up notifications
 
-The bell in the app header lists follow-ups. There is no email and no scheduled job: `GET /api/v1/notifications` computes the list from the follow-up dates on every request, so it can never be out of step with the board.
+The bell in the app header lists follow-ups. The bell has no scheduled job behind it: `GET /api/v1/notifications` computes the list from the follow-up dates on every request, so it can never be out of step with the board. The same follow-ups, plus interviews, are also emailed (see "Reminder emails" below).
 
 | Endpoint | Does | Returns |
 |---|---|---|
@@ -240,7 +240,25 @@ The bell in the app header lists follow-ups. There is no email and no scheduled 
 - **Dismissing** sets `reminder_dismissed_on` to today. A follow-up is listed while `reminder_dismissed_on IS NULL OR reminder_dismissed_on < follow_up_on`. `ApplicationService.update` clears the column when the follow-up date changes, so a rescheduled follow-up notifies again. Upcoming items cannot be dismissed (they are not due yet).
 - **Dismiss is a bulk JPQL update** (`ApplicationRepository.dismissFollowUps`), like `shiftPositions`: it does not bump `@Version`, so an edit form opened before the dismiss still saves without a 409. The same query handles one card or all of them (`:applicationId is null`). It is idempotent, as a DELETE should be.
 - **Why `DELETE` on `/notifications/{applicationId}`:** the resource is "this follow-up in my notifications"; removing it is a delete of the notification, never of the application.
-- **History:** V6 added the column as `reminder_sent_on` for an email version of this feature that was dropped before release; V7 renames it, because an applied migration is never edited.
+- **History:** V6 added the column as `reminder_sent_on` for an email version of this feature that was dropped before release; V7 renames it, because an applied migration is never edited. Emails came back later as a separate feature (V11, below).
+
+### Reminder emails
+
+Two emails, sent by `notification/ReminderEmailJob` through `ReminderEmailService` and `ReminderMailer` (plain text + HTML; company, role and name are HTML-escaped). Locally they land in Mailpit (http://localhost:8025).
+
+| Email | When | Content |
+|---|---|---|
+| Morning digest | Once a day per user, from `digest-time` (08:00 in `notifications.zone`). Nothing to report: no email | The bell's due list (today and overdue, not dismissed) and the interviews still ahead today, with their times |
+| Interview starting soon | When the interview is less than `interview-lead-time` (30 minutes) away | Company, role, start time and minutes to go |
+
+- **One switch per user** (`users.email_reminders_enabled`, on by default) for both emails, in the account menu. `GET /me` returns it as `emailRemindersEnabled`; `PUT /me/email-reminders` with `{"enabled": false}` changes it and answers 200 with the updated profile (400 without `enabled`: a missing value must not silently mean "off"; 403 for the demo account, which never gets email). Both reminder queries filter on it, and the job reads it on every run, so switching off stops the emails **from the next minute**. Nothing is marked while it is off, so switching back on the same day still sends that day's digest. Password-reset emails ignore it: the user asked for those.
+- **One job, every minute** (`jobtrackr.reminder-emails.cron`), instead of a cron at 08:00 plus one timer per interview. Each run asks "what is due now?": that also covers an interview saved 15 minutes ahead (sent within a minute; a start that has passed is never emailed), a time changed after its reminder went out, and a backend that was down at 08:00 (the digest goes out when it starts). Each run is a few indexed queries (`idx_app_interview_at`, partial) that usually find nothing.
+- **What was sent is stored, not inferred from the clock.** `users.digest_sent_on` holds the day that was handled. `applications.interview_reminder_sent_for` holds the interview time the reminder was sent *for*: a reminder is due while `interview_at` is within the lead time and differs from it. Moving the interview makes them differ, which re-arms the reminder with no reset code in `ApplicationService.update`.
+- **Marked only after a successful send**, with bulk JPQL updates that do not bump `@Version` (the user's open edit form never gets a 409 because of the job). The interview update also checks `interview_at = :interviewAt`, so a time changed during the send stays due. A failed send is retried on the next run; the worst case is a duplicate, never a lost email.
+- **No transaction around the loop:** a slow SMTP call must not hold a database transaction open, so each repository call commits on its own. One user's failure is logged (user and application ids, exception type) and the loop goes on.
+- **Not to the demo account:** anyone can use it, and its address is not an inbox we own (with a real provider the email would go to an outside domain). Both queries exclude `DemoAccount.EMAIL`, like the password-reset flow.
+- **Which interviews:** APPLIED, INTERVIEW or OFFER cards (`ReminderEmailService.INTERVIEW_STATUSES`; an offer can still have a final round). Rejected cards are never reminded.
+- **Running two backends** against one database would send everything twice; run the second with `SCHEDULING_ENABLED=false`.
 
 ## 11. CORS
 
@@ -295,6 +313,9 @@ All in `src/main/resources/application.yml`.
 | `jobtrackr.jwt.refresh-cookie-secure` | `${REFRESH_COOKIE_SECURE:false}` | The cookie's `Secure` flag; `false` for `http://localhost`, `true` wherever the API is served over HTTPS |
 | `jobtrackr.scheduling.enabled` | `${SCHEDULING_ENABLED:true}` | Turns background jobs on (`common/config/SchedulingConfig`); `false` in tests |
 | `jobtrackr.token-cleanup.cron` / `.zone` | `0 30 3 * * *`, `Asia/Kolkata` | When expired refresh tokens and reset links are deleted (cron overridable with `TOKEN_CLEANUP_CRON`) |
+| `jobtrackr.reminder-emails.cron` | `${REMINDER_EMAILS_CRON:0 * * * * *}` | How often the reminder-email job checks what is due (every minute); a check interval, not a send time |
+| `jobtrackr.reminder-emails.digest-time` / `.interview-lead-time` | `08:00`, `30m` | When the morning digest goes out (in `notifications.zone`) and how long before an interview its reminder is sent |
+| `jobtrackr.reminder-emails.app-url` / `.from` | `${APP_URL:...}`, `${MAIL_FROM:...}` | The board link and the sender in reminder emails; the same variables as the reset email |
 | `jobtrackr.password-reset.app-url` | `${APP_URL:http://localhost:4200}` | Base URL of the emailed reset link; never derived from the request |
 | `jobtrackr.password-reset.from` | `${MAIL_FROM:JobTrackr <no-reply@jobtrackr.local>}` | Sender of the reset email |
 | `jobtrackr.password-reset.token-ttl` / `.resend-cooldown` | `30m`, `1m` | How long a link works; minimum gap between two emails to one account |
@@ -309,15 +330,15 @@ The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main`
 
 | Kind | Examples | What they prove |
 |---|---|---|
-| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `RefreshTokenServiceTest`, `TokenServiceTest` (real HS256 signing; forged and wrong-key tokens rejected), `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest`, `PasswordResetServiceTest`, `PasswordResetMailerTest` (with a mocked `JavaMailSender`), `RegisterRequestValidationTest` (the password policy) | The service logic, especially the move arithmetic, token rotation and expiry with a fixed `Clock`. Fast |
-| Integration (`@IntegrationTest`, real PostgreSQL in Testcontainers) | `ApplicationApiIntegrationTest` (including another user's card and note being 404 on every endpoint), `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `PasswordResetApiIntegrationTest`, `ExpiredTokenCleanupIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
+| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `RefreshTokenServiceTest`, `TokenServiceTest` (real HS256 signing; forged and wrong-key tokens rejected), `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest`, `ReminderEmailServiceTest` (digest time, catch-up, retry after a failed send), `PasswordResetServiceTest`, `PasswordResetMailerTest` and `ReminderMailerTest` (with a mocked `JavaMailSender`), `RegisterRequestValidationTest` (the password policy) | The service logic, especially the move arithmetic, token rotation and expiry with a fixed `Clock`. Fast |
+| Integration (`@IntegrationTest`, real PostgreSQL in Testcontainers) | `ApplicationApiIntegrationTest` (including another user's card and note being 404 on every endpoint), `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `PasswordResetApiIntegrationTest`, `ExpiredTokenCleanupIntegrationTest`, `ReminderEmailIntegrationTest` (the 30-minute window, an interview moved into it, once per time, the digest's day) | The real SQL, JSON shapes, status codes and the security filter chain |
 | Migration (plain JUnit + Flyway) | `FlywayMigrationIntegrationTest` | Every migration, V1 to the latest file, applied to a new empty schema; checksums validate; the expected tables exist |
 
 **The database for tests** is a throwaway PostgreSQL 16 started by Testcontainers (`TestcontainersConfiguration`), on a random host port, so neither the compose database nor a local PostgreSQL service on 5432 matters. `@ServiceConnection` points `spring.datasource.*` at it. The container is a **static singleton** handed to Spring as a bean: test classes with different `@MockitoBean` sets get different Spring contexts, and a container per context would start several databases; `start()` on a running container does nothing, so the whole run uses one (Ryuk removes it when the JVM exits). `@IntegrationTest` bundles `@SpringBootTest`, the "test" profile and this configuration, so no test can forget the container.
 
 **Coverage:** `mvnw verify` writes a JaCoCo report to `target/site/jacoco/index.html`, with no failing threshold. Surefire's `<argLine>` starts with `@{argLine}`, which keeps the agent JaCoCo puts into that property; a plain value would replace it and the report would show 0%.
 
-Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` and `NotificationApiIntegrationTest` replace `CurrentUserProvider` with a mock and skip the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters. No test calls an external service: `PasswordResetMailer` is mocked wherever an email could be sent, and scheduled jobs are switched off (`jobtrackr.scheduling.enabled=false` in `application-test.yml`); `ExpiredTokenCleanupIntegrationTest` calls the job method directly.
+Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` and `NotificationApiIntegrationTest` replace `CurrentUserProvider` with a mock and skip the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters. No test calls an external service: `PasswordResetMailer` and `ReminderMailer` are mocked wherever an email could be sent, and scheduled jobs are switched off (`jobtrackr.scheduling.enabled=false` in `application-test.yml`); `ExpiredTokenCleanupIntegrationTest` and `ReminderEmailIntegrationTest` call the job logic directly.
 
 The exception to "roll back": `PasswordResetApiIntegrationTest` is **not** `@Transactional`, because the reset email is sent only after commit, and a rolled-back test transaction never commits. It writes for real and deletes its own user in `@AfterEach` (the cascade removes its tokens), and waits for the asynchronous send with `verify(mailer, timeout(...))`.
 
@@ -366,7 +387,8 @@ Constraints any hosting choice must respect:
 - **HTTPS in production:** set `REFRESH_COOKIE_SECURE=true` so the cookie is only sent over HTTPS.
 - **A new, strong `JWT_SECRET`** generated for production, never the local one.
 - **Flyway needs a direct database connection.** Managed databases that put a pooler (PgBouncer in transaction mode) in front of PostgreSQL must give Flyway the direct, non-pooled URL; most require `sslmode=require` in the JDBC URL.
-- **Password-reset email needs a real SMTP provider** in production (`MAIL_*` variables). Without one, the request still answers 204 and the failure is only logged, so the feature should be configured or hidden before the URL is public.
+- **Email needs a real SMTP provider** in production (`MAIL_*` variables). Without one, a reset request still answers 204 and every failed send (reset links, reminder emails) is only logged, so email should be configured or hidden before the URL is public.
+- **Reminder emails need an always-on backend:** the job runs inside the app every minute, and a free tier that sleeps when idle sends nothing while asleep (the digest catches up on wake, a missed interview reminder does not).
 - **Demo data ages:** `V4__demo_user_data.sql` runs once, with dates relative to that day, so on a long-lived deployment the demo's follow-ups drift into the past.
 
 Free hosting options, as researched in October 2026 (free tiers change often; re-check before relying on them):

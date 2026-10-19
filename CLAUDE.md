@@ -21,7 +21,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 ## Stack
 
 - Backend: `jobtrackr-backend` — Spring Boot 4.1.x, Java 21, Maven (use the wrapper, `mvnw.cmd`)
-- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Mail (password-reset links, caught locally by Mailpit), Lombok
+- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Mail (password-reset links and reminder emails, caught locally by Mailpit), Lombok
 - springdoc-openapi 3.x for Swagger UI (the 3.x line is the one for Boot 4; its version is pinned in `pom.xml`)
 - PostgreSQL 16 in Docker (`docker-compose.yml` at this root)
 - Tests: JUnit 5, Mockito, AssertJ, MockMvc, Testcontainers (PostgreSQL 16), JaCoCo coverage report
@@ -73,7 +73,7 @@ docker compose --profile full up --build
 - **Schema changes only through Flyway** migrations in `src/main/resources/db/migration`. `ddl-auto` stays `validate`. Never edit a migration that has been applied; add a new `V<n>__description.sql`.
 - **Test every service method** with a mocked unit test. Add an integration test when the behaviour depends on real SQL or the security filter chain.
 - **Meaningful names** for variables, parameters, query parameters and columns. No abbreviations such as `q` or `cb`; write `searchText`, `criteriaBuilder`.
-- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404. The exceptions have no signed-in user by nature: the nightly cleanup job's housekeeping deletes, and the password-reset flow, which identifies the user by email address or hashed reset token.
+- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404. The exceptions have no signed-in user by nature: the nightly cleanup job's housekeeping deletes, the reminder-email job's queries (every user's due emails, each sent to the row's owner), and the password-reset flow, which identifies the user by email address or hashed reset token.
 - **Comments explain why, not what**, and every class has a short comment stating its role. Schema documentation lives in `COMMENT ON` statements (see `V3__schema_comments.sql`).
 - Entities use Lombok `@Getter`/`@Setter` (not `@Data`), lazy `@ManyToOne`, and no `@OneToMany` collections.
 
@@ -106,16 +106,16 @@ docker compose --profile full up --build
 - The JVM runs in UTC (set in `main` and in the surefire config). Windows reports the zone as `Asia/Calcutta`, which the `postgres:16` image rejects on connect.
 - A locally installed PostgreSQL service on port 5432 hides the Docker container and causes "password authentication failed". Stop the Windows service before starting the container.
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
-- Password-reset emails go to the Mailpit container (SMTP localhost:1025), which delivers nothing; read them at http://localhost:8025. If it is not running, the send fails with only a warning in the log (the request still answers 204). Tests mock `PasswordResetMailer` and never send.
+- Emails (password reset, reminders) go to the Mailpit container (SMTP localhost:1025), which delivers nothing; read them at http://localhost:8025. If it is not running, the send fails with only a warning in the log (a reset request still answers 204; a reminder is retried every minute). Tests mock `PasswordResetMailer` and `ReminderMailer` and never send. The demo account never gets email.
 - Integration tests are annotated `@IntegrationTest` (Spring Boot test + "test" profile + the shared Testcontainers PostgreSQL). A plain `@SpringBootTest` would try localhost:5432 instead. Surefire's `argLine` must keep `@{argLine}` first, or JaCoCo's agent is dropped and coverage reads 0%.
 - Docker: plain `docker compose up -d` starts only PostgreSQL and Mailpit (the dev setup); backend and frontend are under the `full` profile. Compose reads every variable in the file even for services it will not start, so required variables use `${NAME:-}` (empty default), never `${NAME:?}`, which would break plain `up -d`.
 - The frontend image's production `apiBaseUrl` is the relative `/api/v1`: nginx (`jobtrackr-frontend/nginx.conf`) proxies `/api/` to the backend. `ng serve` keeps the absolute `http://localhost:8080/api/v1` from `environment.development.ts`.
 - Only `/actuator/health` (and `/health/liveness`, `/health/readiness`) is public, without details; the mail health indicator is off so a missing SMTP server cannot mark the app DOWN.
 - CI runs on Linux: `jobtrackr-backend/mvnw` must keep its executable bit in git (`git update-index --chmod=+x`) and LF line endings (`jobtrackr-backend/.gitattributes`); `.gitattributes` at the root keeps the husky hook LF too. Windows does not track either by itself.
-- Scheduled jobs (`ExpiredTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
+- Scheduled jobs (`ExpiredTokenCleanupJob` nightly, `ReminderEmailJob` every minute) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted (by decision), so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.
 
 ## Not built yet
 
-Nothing planned. Out of scope by decision: hosting (the app runs locally; ARCHITECTURE section 17 has the prepared configuration and a comparison of free hosts), AI resume match (its tables were dropped in V8). Email is used only for password-reset links, sent to the local Mailpit container; follow-up reminders are in-app only (the header bell, `notification` package). Real email delivery would only need MAIL_* environment variables for a provider.
+Nothing planned. Out of scope by decision: hosting (the app runs locally; ARCHITECTURE section 17 has the prepared configuration and a comparison of free hosts), AI resume match (its tables were dropped in V8). Email (password-reset links, the 8:00 reminder digest and the 30-minute interview reminder, which users switch off in the account menu) goes to the local Mailpit container; real delivery would only need MAIL_* environment variables for a provider.

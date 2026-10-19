@@ -16,6 +16,7 @@ export function makeCard(id: number, status: ApplicationStatus, position: number
     source: null,
     appliedOn: '2026-10-01',
     followUpOn: null,
+    interviewAt: null,
     version: 0,
     createdAt: '2026-10-01T10:00:00Z',
     updatedAt: '2026-10-01T10:00:00Z',

@@ -125,6 +125,44 @@
         }
       </mat-form-field>
 
+      <mat-form-field appearance="outline">
+        <mat-label>Interview date</mat-label>
+        <input matInput [matDatepicker]="interviewDatePicker" formControlName="interviewDate" placeholder="dd/mm/yyyy" />
+        <mat-datepicker-toggle matIconSuffix [for]="interviewDatePicker" />
+        <mat-datepicker #interviewDatePicker />
+        @if (form.controls.interviewDate.hasError('matDatepickerParse')) {
+          <mat-error>Use the format dd/mm/yyyy</mat-error>
+        }
+      </mat-form-field>
+
+      <!-- Sharing the grid cell: a combo box for the time (type any time, or pick a half-hour step), then AM/PM -->
+      <div class="grid grid-cols-[1fr_7.5rem] gap-3">
+        <mat-form-field appearance="outline">
+          <mat-label>Interview time</mat-label>
+          <input matInput formControlName="interviewTime" [matAutocomplete]="interviewTimeOptions" placeholder="e.g. 7:45" autocomplete="off" />
+          <mat-icon matIconSuffix aria-hidden="true">schedule</mat-icon>
+          <mat-autocomplete #interviewTimeOptions="matAutocomplete">
+            @for (time of interviewTimes(); track time) {
+              <mat-option [value]="time">{{ time }}</mat-option>
+            }
+          </mat-autocomplete>
+          @if (form.controls.interviewTime.hasError('twelveHourTime')) {
+            <mat-error>Enter a time like 7:30</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>AM/PM</mat-label>
+          <mat-select formControlName="interviewMeridiem">
+            <mat-option value="AM">AM</mat-option>
+            <mat-option value="PM">PM</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      @if (form.hasError('interviewIncomplete') && (form.controls.interviewDate.touched || form.controls.interviewTime.touched)) {
+        <p class="form-group-error m-0 -mt-2 text-xs sm:col-span-2" role="alert">Pick both a date and a time for the interview, or clear both</p>
+      }
+
       <mat-form-field appearance="outline" class="sm:col-span-2">
         <mat-label>Job description URL</mat-label>
         <input matInput type="url" formControlName="jdUrl" placeholder="https://" />
@@ -135,7 +173,7 @@
 
       <mat-form-field appearance="outline" class="sm:col-span-2">
         <mat-label>Job description</mat-label>
-        <textarea matInput formControlName="jdText" rows="5" placeholder="Paste the job description (used for the resume match)"></textarea>
+        <textarea matInput formControlName="jdText" rows="5" placeholder="Paste the job description, for reference"></textarea>
       </mat-form-field>
     </div>
 

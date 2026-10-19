@@ -26,6 +26,7 @@ public class ApplicationMapper {
                 application.getSource(),
                 application.getAppliedOn(),
                 application.getFollowUpOn(),
+                application.getInterviewAt(),
                 application.getVersion(),
                 application.getCreatedAt(),
                 application.getUpdatedAt());
@@ -47,6 +48,7 @@ public class ApplicationMapper {
         application.setSource(request.source());
         application.setAppliedOn(request.appliedOn());
         application.setFollowUpOn(request.followUpOn());
+        application.setInterviewAt(request.interviewAt());
         return application;
     }
 
@@ -63,5 +65,6 @@ public class ApplicationMapper {
         application.setSource(request.source());
         application.setAppliedOn(request.appliedOn());
         application.setFollowUpOn(request.followUpOn());
+        application.setInterviewAt(request.interviewAt());
     }
 }

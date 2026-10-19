@@ -85,6 +85,19 @@
         </div>
         <mat-divider />
       }
+      <!-- One switch for all reminder emails. The demo account never gets email, so it cannot switch them on. -->
+      @if (user(); as signedIn) {
+        <button
+          mat-menu-item
+          role="menuitemcheckbox"
+          [attr.aria-checked]="signedIn.emailRemindersEnabled"
+          (click)="toggleEmailReminders()"
+          [disabled]="isDemoAccount()"
+        >
+          <mat-icon>{{ signedIn.emailRemindersEnabled && !isDemoAccount() ? 'mark_email_read' : 'unsubscribe' }}</mat-icon>
+          <span>{{ isDemoAccount() ? 'Reminder emails (not for the demo)' : signedIn.emailRemindersEnabled ? 'Reminder emails: On' : 'Reminder emails: Off' }}</span>
+        </button>
+      }
       <!-- The demo account is shared, so its password is fixed (the backend refuses with 403 as well) -->
       <button mat-menu-item (click)="changePassword()" [disabled]="isDemoAccount()">
         <mat-icon>lock_reset</mat-icon>

@@ -1,6 +1,7 @@
 package com.jobtrackr.jobtrackrbackend.user;
 
 import com.jobtrackr.jobtrackrbackend.common.CurrentUserProvider;
+import com.jobtrackr.jobtrackrbackend.common.exception.ForbiddenException;
 import com.jobtrackr.jobtrackrbackend.common.exception.NotFoundException;
 import com.jobtrackr.jobtrackrbackend.user.dto.UserResponse;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,29 @@ class UserServiceTest {
 
         assertThat(response.email()).isEqualTo("varsha@example.com");
         assertThat(response.fullName()).isEqualTo("Varsha");
+        assertThat(response.emailRemindersEnabled()).isTrue();
+    }
+
+    @Test
+    void setEmailReminders_storesTheSwitch_andReturnsTheUpdatedProfile() {
+        User user = new User("varsha@example.com", "hash", "Varsha");
+        when(currentUser.getUserId()).thenReturn(7L);
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+
+        UserResponse response = service.setEmailReminders(false);
+
+        assertThat(user.isEmailRemindersEnabled()).isFalse();
+        assertThat(response.emailRemindersEnabled()).isFalse();
+    }
+
+    @Test
+    void setEmailReminders_forTheDemoAccount_isForbidden() {
+        User demo = new User(DemoAccount.EMAIL, "hash", "Demo User");
+        when(currentUser.getUserId()).thenReturn(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(demo));
+
+        assertThatThrownBy(() -> service.setEmailReminders(false)).isInstanceOf(ForbiddenException.class);
+        assertThat(demo.isEmailRemindersEnabled()).isTrue();
     }
 
     @Test

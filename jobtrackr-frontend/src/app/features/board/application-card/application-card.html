@@ -67,8 +67,19 @@
           {{ card.source }}
         </span>
 
-        @if (followUp(); as followUpInfo) {
+        @if (followUp() || interview()) {
           <mat-chip-set>
+            @if (interview(); as interviewInfo) {
+              <mat-chip disableRipple [class.follow-up-today]="interviewInfo.isToday">
+                <mat-icon matChipAvatar aria-hidden="true">groups</mat-icon>
+                @if (interviewInfo.isToday) {
+                  Interview today · {{ interviewInfo.start | date: 'h:mm a' }}
+                } @else {
+                  Interview · {{ interviewInfo.start | date: 'd MMM, h:mm a' }}
+                }
+              </mat-chip>
+            }
+            @if (followUp(); as followUpInfo) {
             <mat-chip
               disableRipple
               [class.follow-up-overdue]="followUpInfo.state === 'overdue'"
@@ -89,6 +100,7 @@
                 }
               }
             </mat-chip>
+            }
           </mat-chip-set>
         }
       </div>

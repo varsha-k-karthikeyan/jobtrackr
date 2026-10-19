@@ -84,6 +84,21 @@ export class Shell {
 
   protected readonly isDemoAccount = computed(() => this.user()?.email === DEMO_CREDENTIALS.email);
 
+  /** Flips the reminder-email switch. Nothing is sent from the next minute on (the job runs every minute). */
+  protected toggleEmailReminders(): void {
+    const enabled = !this.user()?.emailRemindersEnabled;
+    // A failure is already shown by the error interceptor, and the switch keeps its old state
+    this.auth.setEmailReminders(enabled).subscribe({
+      next: () =>
+        this.notifier.show(
+          enabled
+            ? 'Reminder emails are on: the 8:00 AM digest and a reminder 30 minutes before each interview.'
+            : 'Reminder emails are turned off',
+        ),
+      error: () => undefined,
+    });
+  }
+
   protected changePassword(): void {
     // Loaded on first use: most sessions never open this dialog
     void import('../../../shared/components/change-password-dialog/change-password-dialog').then(

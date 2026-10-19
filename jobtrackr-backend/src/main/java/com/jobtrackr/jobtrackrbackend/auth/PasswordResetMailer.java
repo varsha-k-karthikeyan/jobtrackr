@@ -1,5 +1,6 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
+import com.jobtrackr.jobtrackrbackend.common.EmailGreeting;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -56,8 +57,6 @@ public class PasswordResetMailer {
     }
 
     private static String greeting(PasswordResetRequested request) {
-        return request.recipientName() == null || request.recipientName().isBlank()
-                ? "Hi,"
-                : "Hi " + request.recipientName() + ",";
+        return EmailGreeting.of(request.recipientName(), request.email());
     }
 }

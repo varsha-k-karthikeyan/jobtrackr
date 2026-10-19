@@ -54,8 +54,8 @@ class PasswordResetMailerTest {
     }
 
     @Test
-    void greetsGenericallyWithoutAName() {
-        assertThat(PasswordResetMailer.plainText(new PasswordResetRequested(7L, "x@test.dev", null, LINK, Duration.ofMinutes(30))))
-                .startsWith("Hi,");
+    void greetsByTheAddressBeforeTheAt_withoutAName() {
+        assertThat(PasswordResetMailer.plainText(new PasswordResetRequested(7L, "varsha.k.karthikeyan@test.dev", null, LINK, Duration.ofMinutes(30))))
+                .startsWith("Hi varsha.k.karthikeyan,");
     }
 }

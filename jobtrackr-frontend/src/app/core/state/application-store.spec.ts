@@ -140,6 +140,7 @@ describe('ApplicationStore', () => {
     const creating = store.create({
       company: 'Groww', role: 'Frontend Engineer', status: 'APPLIED', jdUrl: null, jdText: null, location: null,
       salaryMinLpa: null, salaryMaxLpa: null, source: null, appliedOn: null, followUpOn: null,
+      interviewAt: null,
     });
     http.expectOne(`${API}/applications`).flush(makeCard(7, 'APPLIED', 2, { company: 'Groww' }));
     await creating;
@@ -151,7 +152,7 @@ describe('ApplicationStore', () => {
     await loadBoard();
     const updating = store.update(1, {
       company: 'Razorpay', role: 'Engineer', status: 'INTERVIEW', jdUrl: null, jdText: null, location: null,
-      salaryMinLpa: null, salaryMaxLpa: null, source: null, appliedOn: null, followUpOn: null, version: 3,
+      salaryMinLpa: null, salaryMaxLpa: null, source: null, appliedOn: null, followUpOn: null, interviewAt: null, version: 3,
     });
     http.expectOne(`${API}/applications/1`).flush({ ...razorpay, status: 'INTERVIEW', position: 1, version: 4 });
     await updating;
@@ -163,7 +164,7 @@ describe('ApplicationStore', () => {
     await loadBoard();
     const updating = store.update(2, {
       company: 'Postman Inc', role: 'Engineer', status: 'APPLIED', jdUrl: null, jdText: null, location: null,
-      salaryMinLpa: null, salaryMaxLpa: null, source: null, appliedOn: null, followUpOn: null, version: 0,
+      salaryMinLpa: null, salaryMaxLpa: null, source: null, appliedOn: null, followUpOn: null, interviewAt: null, version: 0,
     });
     http.expectOne(`${API}/applications/2`).flush({ ...postman, company: 'Postman Inc', version: 1 });
     await updating;

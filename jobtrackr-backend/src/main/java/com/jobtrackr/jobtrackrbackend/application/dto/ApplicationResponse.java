@@ -21,6 +21,7 @@ public record ApplicationResponse(
         String source,
         LocalDate appliedOn,
         LocalDate followUpOn,
+        Instant interviewAt,
         Integer version,
         Instant createdAt,
         Instant updatedAt

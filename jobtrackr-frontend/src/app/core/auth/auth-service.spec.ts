@@ -11,7 +11,7 @@ import { AuthService } from './auth-service';
 const API = environment.apiBaseUrl;
 const TOKEN_KEY = 'jobtrackr.accessToken';
 const HINT_KEY = 'jobtrackr.hasSession';
-const user: User = { id: 1, email: 'demo@jobtrackr.dev', fullName: 'Demo User', createdAt: '2026-10-13T16:20:35Z' };
+const user: User = { id: 1, email: 'demo@jobtrackr.dev', fullName: 'Demo User', createdAt: '2026-10-13T16:20:35Z', emailRemindersEnabled: true };
 
 describe('AuthService', () => {
   let http: HttpTestingController;
@@ -26,6 +26,18 @@ describe('AuthService', () => {
 
   beforeEach(() => localStorage.clear());
   afterEach(() => http.verify());
+
+  it('switches reminder emails and keeps the updated profile', async () => {
+    const auth = setUp();
+    auth.setEmailReminders(false).subscribe();
+
+    const request = http.expectOne(`${API}/me/email-reminders`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ enabled: false });
+    request.flush({ ...user, emailRemindersEnabled: false });
+
+    expect(auth.user()?.emailRemindersEnabled).toBe(false);
+  });
 
   it('stores the access token after login, sends credentials for the refresh cookie, and loads the profile', async () => {
     const auth = setUp();

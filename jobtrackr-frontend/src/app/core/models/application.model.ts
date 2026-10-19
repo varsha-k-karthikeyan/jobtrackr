@@ -38,6 +38,8 @@ export interface Application {
   source: string | null;
   appliedOn: IsoDate | null;
   followUpOn: IsoDate | null;
+  /** Scheduled interview start, an exact instant (ISO with Z). Drives the reminder emails. */
+  interviewAt: IsoInstant | null;
   /** Optimistic-lock counter; must be sent back unchanged on PUT. */
   version: number;
   createdAt: IsoInstant;
@@ -56,6 +58,7 @@ interface ApplicationFields {
   source: string | null;
   appliedOn: IsoDate | null;
   followUpOn: IsoDate | null;
+  interviewAt: IsoInstant | null;
 }
 
 /** POST /applications. No position: the backend appends the card to the bottom of its column. */

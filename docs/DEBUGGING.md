@@ -63,6 +63,18 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 
 A link that "doesn't work" was already used, is older than 30 minutes, or was replaced by a newer request (only the newest link works). Request a new one.
 
+### Reminder email does not arrive
+
+| Check | Why |
+|---|---|
+| Open http://localhost:8025 | Locally every email goes to Mailpit |
+| The backend log has `Reminder emails sent: ...` | Printed only when something was sent. A `could not be sent: MailSendException` warning means Mailpit is down; it is retried every minute |
+| You are not using the demo account | The demo account never gets reminder emails, on purpose. Register your own account |
+| The account menu says "Reminder emails: On" | Off (`users.email_reminders_enabled = false`) stops both emails from the next minute |
+| `SCHEDULING_ENABLED` is not `false` | The job does not run at all then |
+| Interview: it starts less than 30 minutes from now, in the future, on a card that is not Rejected | Earlier than 30 minutes is too soon; a start that has passed is never emailed. `interview_reminder_sent_for = interview_at` means it was already sent for that time |
+| Digest: it is after 08:00 India time and `users.digest_sent_on` is not today | Today already handled (sent, or nothing to report) means no second digest. `update users set digest_sent_on = null where id = ...` makes the next minute send it again |
+
 ### 404 on a record you can see in the database
 
 The record belongs to a different user. Every lookup includes `user_id` (see ARCHITECTURE, section 5). Compare the token's subject with the row:
@@ -121,6 +133,7 @@ An exception with no handler. The stack trace is in the application log. Find th
 | A field is missing or null in the response | `ApplicationMapper`: was the field added to `toResponse`, `toEntity` and `applyUpdate`? |
 | A validation message is wrong | The annotations on the request record; then `GlobalExceptionHandler.handleMethodArgumentNotValid` |
 | The bell shows the wrong follow-ups or count | `NotificationService.getNotifications`; check `today` (decided in `notifications.zone`) and the rows from `findOpenFollowUps` |
+| A reminder email is wrong, missing or sent twice | `ReminderEmailService` (`sendInterviewReminders`, `sendDueDigests`); then the rows from `findInterviewsDueForReminder` / `findDueForDigest`. Two backends on one database send everything twice |
 | Old refresh-token or reset-link rows are not cleaned up | `ExpiredTokenCleanupJob.deleteExpiredTokens`; the log prints `Token cleanup deleted N expired refresh token(s) and M expired reset link(s)` each night. No line at all: `jobtrackr.scheduling.enabled` is false |
 
 ## 5. See what the app is doing

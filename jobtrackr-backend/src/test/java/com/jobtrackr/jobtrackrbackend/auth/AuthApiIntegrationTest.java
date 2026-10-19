@@ -147,6 +147,37 @@ class AuthApiIntegrationTest {
     }
 
     @Test
+    void emailReminderSwitch_isOnByDefault_andCanBeTurnedOffAndOn() throws Exception {
+        String token = register(email);
+
+        mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$.emailRemindersEnabled").value(true));
+        mockMvc.perform(put("/api/v1/me/email-reminders").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emailRemindersEnabled").value(false));
+        mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$.emailRemindersEnabled").value(false));
+
+        // A missing value is a 400, never a silent "off"
+        mockMvc.perform(put("/api/v1/me/email-reminders").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.enabled").exists());
+        mockMvc.perform(put("/api/v1/me/email-reminders").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": true}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void emailReminderSwitch_isForbiddenForTheDemoAccount() throws Exception {
+        String token = login("demo@jobtrackr.dev", "Demo@1234");
+
+        mockMvc.perform(put("/api/v1/me/email-reminders").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": false}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void publicDemoAccount_canLogIn() throws Exception {
         // Guards the hash written by V4__demo_user_data.sql: the README and the frontend publish these credentials
         String token = login("demo@jobtrackr.dev", "Demo@1234");

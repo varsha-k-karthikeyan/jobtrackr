@@ -159,7 +159,7 @@ class ApplicationServiceTest {
         when(applicationRepository.countByUserIdAndStatus(USER_ID, INTERVIEW)).thenReturn(3L);
 
         ApplicationResponse response = service.create(new CreateApplicationRequest(
-                "Acme", "Backend Engineer", INTERVIEW, null, null, null, null, null, null, null, null));
+                "Acme", "Backend Engineer", INTERVIEW, null, null, null, null, null, null, null, null, null));
 
         ArgumentCaptor<Application> saved = ArgumentCaptor.forClass(Application.class);
         verify(applicationRepository).save(saved.capture());
@@ -238,7 +238,7 @@ class ApplicationServiceTest {
         card.setReminderDismissedOn(LocalDate.of(2026, 10, 10));
 
         service.update(5L, new UpdateApplicationRequest("Acme", "Engineer", null, null, null, null, null, null, null,
-                null, LocalDate.of(2026, 10, 20), 0));
+                null, LocalDate.of(2026, 10, 20), null, 0));
 
         assertThat(card.getReminderDismissedOn()).isNull();
         assertThat(card.getFollowUpOn()).isEqualTo(LocalDate.of(2026, 10, 20));
@@ -251,7 +251,7 @@ class ApplicationServiceTest {
         card.setReminderDismissedOn(LocalDate.of(2026, 10, 10));
 
         service.update(5L, new UpdateApplicationRequest("Acme Corp", "Engineer", null, null, null, null, null, null, null,
-                null, LocalDate.of(2026, 10, 10), 0));
+                null, LocalDate.of(2026, 10, 10), null, 0));
 
         assertThat(card.getReminderDismissedOn()).isEqualTo(LocalDate.of(2026, 10, 10));
     }
@@ -413,6 +413,6 @@ class ApplicationServiceTest {
     }
 
     private static UpdateApplicationRequest updateRequest(String company, String role, ApplicationStatus status, int version) {
-        return new UpdateApplicationRequest(company, role, status, null, null, null, null, null, null, null, null, version);
+        return new UpdateApplicationRequest(company, role, status, null, null, null, null, null, null, null, null, null, version);
     }
 }

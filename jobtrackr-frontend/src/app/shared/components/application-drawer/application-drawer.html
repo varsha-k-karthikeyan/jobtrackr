@@ -62,6 +62,9 @@
           }
         </dd>
 
+        <dt>Interview</dt>
+        <dd>{{ card.interviewAt ? (card.interviewAt | date: 'd MMM y, h:mm a') : '—' }}</dd>
+
         <dt>Job link</dt>
         <dd class="min-w-0">
           @if (card.jdUrl) {

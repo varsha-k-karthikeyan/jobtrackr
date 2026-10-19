@@ -318,6 +318,36 @@ class ApplicationApiIntegrationTest {
     }
 
     @Test
+    void interviewAt_isStoredAsAnInstant_andCanBeChangedOrCleared() throws Exception {
+        String created = mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"company": "Acme", "role": "Engineer", "status": "INTERVIEW",
+                                 "interviewAt": "2026-10-21T09:00:00Z"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.interviewAt").value("2026-10-21T09:00:00Z"))
+                .andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(created, "$.id")).longValue();
+
+        // A time typed in India (UTC+05:30) is the same instant, normalised to UTC
+        mockMvc.perform(put(BASE + "/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"company": "Acme", "role": "Engineer", "interviewAt": "2026-10-21T15:00:00+05:30", "version": 0}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interviewAt").value("2026-10-21T09:30:00Z"));
+        sync();
+
+        // Like every field of a PUT, leaving it out clears it
+        mockMvc.perform(put(BASE + "/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"company": "Acme", "role": "Engineer", "version": 1}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interviewAt").doesNotExist());
+    }
+
+    @Test
     void anotherUsersApplication_is404OnEveryEndpoint_andStaysUnchanged() throws Exception {
         long ownersCard = create("Acme", "APPLIED");
         Long ownerId = currentUser.getUserId();

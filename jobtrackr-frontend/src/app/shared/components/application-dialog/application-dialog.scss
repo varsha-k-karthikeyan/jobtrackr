@@ -1,4 +1,5 @@
-.salary-range-error {
+.salary-range-error,
+.form-group-error {
   // Same colour and size as Material's own <mat-error>
   color: var(--mat-sys-error);
   padding-left: 1rem;

@@ -27,7 +27,9 @@ _Screenshots are being added; see [docs/screenshots](docs/screenshots/README.md)
 - **Kanban board** with four columns (Applied, Interview, Offer, Rejected). Drag and drop is optimistic (the card moves at once and rolls back if the server refuses), and positions stay gap-free on the server.
 - **Details drawer** with notes, an edit dialog that detects concurrent edits (409) and reloads the latest version, and delete with confirmation.
 - **Searchable list**: server-side paging and sorting, free-text search over company, role, location, source and status, a status filter and a two-thumb salary range slider; the whole view lives in the URL, so reload and back/forward work.
+- **Interviews**: give a card an interview date and time (type it or pick a 30-minute step, plus AM/PM); it shows on the card ("Interview today · 2:30 PM") and in the details drawer.
 - **Follow-up reminders**: a bell in the header lists follow-ups that are due, overdue or coming up in the next 7 days; dismiss one or all; clicking opens the card.
+- **Reminder emails**: an 8:00 AM digest of due follow-ups and the day's interviews with their times, and an email 30 minutes before each interview (also when the time is set or changed less than 30 minutes ahead). One on/off switch in the account menu; off takes effect from the next minute.
 - **Stats strip**: totals per column and the response rate.
 - **Accounts**: register, log in, change password, and "forgot password" by email (locally caught by Mailpit). Sessions survive reloads and stay alive while you use the app.
 - **Try the demo**: a public demo account with 16 sample applications, one click from the login page.
@@ -50,7 +52,7 @@ flowchart LR
     browser["Browser<br/>Angular app"] -->|"same origin<br/>/api/v1/..."| nginx["nginx<br/>static files + /api/ proxy"]
     nginx -->|"/api/"| api["Spring Boot API<br/>Java 21"]
     api -->|"JPA + Flyway"| db[("PostgreSQL 16")]
-    api -.->|"reset emails (local: Mailpit)"| mail["SMTP"]
+    api -.->|"reset links, reminders (local: Mailpit)"| mail["SMTP"]
     browser -. "access token (15 min):<br/>Authorization: Bearer" .-> nginx
     browser -. "refresh token (14 days):<br/>httpOnly cookie, Path=/api/v1/auth" .-> nginx
 ```
@@ -70,7 +72,7 @@ docker compose --profile full up --build     # PostgreSQL, Mailpit, the API and 
 
 Then open **http://localhost:4200** and click **Try the demo**.
 
-Also running: Swagger UI at http://localhost:8080/swagger-ui.html, the Mailpit inbox (password-reset emails) at http://localhost:8025. Stop with `Ctrl+C`, or `docker compose --profile full down` (keeps the data).
+Also running: Swagger UI at http://localhost:8080/swagger-ui.html, the Mailpit inbox (password-reset and reminder emails) at http://localhost:8025. Stop with `Ctrl+C`, or `docker compose --profile full down` (keeps the data).
 
 ## Developer setup
 
@@ -106,7 +108,7 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 
 A real `JWT_SECRET` environment variable, if set, takes priority over the file; that is how a deployed server would provide it. Keep the value stable: changing it logs out everyone who holds a token.
 
-Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example). Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`, `SCHEDULING_ENABLED`, `TOKEN_CLEANUP_CRON`, `APP_URL`, `MAIL_FROM`, the `MAIL_*` server settings and the Docker settings) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
+Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example). Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`, `SCHEDULING_ENABLED`, `TOKEN_CLEANUP_CRON`, `REMINDER_EMAILS_CRON`, `APP_URL`, `MAIL_FROM`, the `MAIL_*` server settings and the Docker settings) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
 
 #### Environment variables in an IntelliJ run configuration (Windows)
 
@@ -123,9 +125,12 @@ Use this instead of the file, or to override it:
 
 Open http://localhost:8080/swagger-ui.html, call `POST /api/v1/auth/register` (or `/login`), copy `accessToken` from the response, click **Authorize** and paste it (without the word "Bearer"). Every other endpoint then works.
 
-### Emails (forgot password)
+### Emails (forgot password, reminders)
 
-"Forgot password?" emails a reset link. Locally nothing is really delivered: the backend sends to **Mailpit**, a mail catcher started by `docker compose up -d`, and you read the email at http://localhost:8025. No account is needed. The link works once and expires after 30 minutes. To deliver real email, point the `MAIL_*` variables at a provider; no code changes.
+Locally nothing is really delivered: the backend sends to **Mailpit**, a mail catcher started by `docker compose up -d`, and you read every email at http://localhost:8025. No account is needed. To deliver real email, point the `MAIL_*` variables at a provider; no code changes.
+
+- **Forgot password** emails a reset link. It works once and expires after 30 minutes.
+- **Reminder emails** come from a job that checks every minute: the morning digest from 8:00 AM (India time; sent later the same day if the backend was not running at 8), and a reminder once an interview is less than 30 minutes away. Register your own account to receive them: the shared demo account gets none. Switch them off (and on) in the account menu, under your name; off takes effect from the next minute.
 
 ## Tests and quality
 
@@ -146,7 +151,8 @@ Open http://localhost:8080/swagger-ui.html, call `POST /api/v1/auth/register` (o
 - **Flyway owns the schema; Hibernate only validates it** (`ddl-auto=validate`). Every change is a new numbered migration, never an edit to an applied one, and a test migrates an empty database from V1 to the latest version on every run.
 - **Optimistic locking and gap-free positions.** Each card carries a `version`; saving a stale copy is a 409 and the edit dialog reloads the latest version. Moving a card shifts its neighbours with one bulk `UPDATE` that does not touch their versions, so dragging one card never makes the others stale.
 - **Every query is scoped to the current user.** The user id comes only from the verified JWT, never from a URL or body, and another user's record looks exactly like a missing one (404). Integration tests check this for every endpoint.
-- **Follow-up notifications are computed per request**, from the follow-up dates, in an explicit time zone (`Asia/Kolkata`, not the JVM's UTC). There is no email and no background job behind them, so they can never be out of step with the board. (Email exists only for password-reset links; the one scheduled job deletes expired tokens at night.)
+- **Follow-up notifications are computed per request**, from the follow-up dates, in an explicit time zone (`Asia/Kolkata`, not the JVM's UTC), so the bell can never be out of step with the board.
+- **Reminder emails: one job that runs every minute and asks "what is due now?"** instead of a cron at 8:00 plus a timer per interview. It covers an interview saved 15 minutes ahead, a time changed after its reminder went out, and a backend that was down at 8:00. What was sent is stored (for an interview: the time it was sent *for*, so moving the interview re-arms it), and only after a successful send.
 - **Testcontainers instead of a shared database** for integration tests: one throwaway PostgreSQL 16 for the whole run, the same version as development and production, on any machine with Docker.
 - **One origin in production.** nginx proxies `/api/`, so the refresh cookie stays first-party, CORS is unnecessary and the security model is the same as in development.
 
@@ -162,6 +168,7 @@ Base path `/api/v1`. Everything except `/auth/**` (and the health check) needs `
 | `POST /auth/forgot-password` | Emails a single-use, 30-minute reset link; always 204, so it never reveals whether an address is registered |
 | `POST /auth/reset-password` | Sets a new password from the link and ends every session; 400 if the link is used, expired or unknown |
 | `GET /me`, `PUT /me/password` | The caller's profile; change password (400 on a wrong current password, 403 for the demo account) |
+| `PUT /me/email-reminders` | Switches reminder emails on or off (`{"enabled": false}`); answers with the updated profile. 403 for the demo account |
 | `GET /applications/board` | All cards grouped by status, ordered by position |
 | `GET /applications?status=&searchText=&salaryFrom=&salaryTo=&sort=&page=&size=` | Filtered, sorted, paginated list; empty values sort last |
 | `POST /applications`, `GET`/`PUT`/`DELETE /applications/{id}` | Create (appended to its column), read with notes, update (needs the current `version`), delete |
@@ -194,7 +201,6 @@ The data is created by the Flyway migration `V4__demo_user_data.sql` in your own
 
 - **Host it** if it ever needs a public URL. The images, health check and configuration are ready, and the hosting options are compared in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#17-deployment).
 - **AI resume match**: score a resume against a job description and list matched and missing skills (the reason `jdText` is stored with each application).
-- **Email follow-up reminders** through an SMTP provider, alongside the in-app bell.
 - **A "log out everywhere" button**: reuse detection already revokes every session internally; it only needs an endpoint and a menu item.
 - **Playwright end-to-end tests** against the Docker stack in CI (log in as demo, move a card, reload).
 

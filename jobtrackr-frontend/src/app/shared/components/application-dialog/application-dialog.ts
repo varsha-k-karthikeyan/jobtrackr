@@ -1,6 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { DateAdapter, MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -19,9 +21,17 @@ import {
   ApplicationStatus,
 } from '../../../core/models/application.model';
 import { ApplicationStore } from '../../../core/state/application-store';
-import { dateToIsoDate, isoDateToDate } from '../../utils/dates';
+import {
+  combineDateAndTime,
+  dateToIsoDate,
+  isoDateToDate,
+  matchingTimes,
+  Meridiem,
+  parseTwelveHourTime,
+  toTwelveHourTime,
+} from '../../utils/dates';
 import { DayMonthYearDateAdapter } from '../../utils/day-month-year-date-adapter';
-import { maxDecimalPlaces, salaryRangeValidator } from './application-form-validators';
+import { interviewDateTimeValidator, maxDecimalPlaces, salaryRangeValidator, twelveHourTimeValidator } from './application-form-validators';
 
 export type ApplicationDialogData =
   | { mode: 'create'; status: ApplicationStatus }
@@ -32,6 +42,7 @@ export type ApplicationDialogData =
   selector: 'app-application-dialog',
   imports: [
     ReactiveFormsModule,
+    MatAutocompleteModule,
     MatButtonModule,
     MatDatepickerModule,
     MatDialogModule,
@@ -96,9 +107,20 @@ export class ApplicationDialog {
       source: this.formBuilder.control<string | null>(null),
       appliedOn: this.formBuilder.control<Date | null>(null),
       followUpOn: this.formBuilder.control<Date | null>(null),
+      // Date, a typed or picked 12-hour time ("7:45", '' = none) and AM/PM: combined into one instant on save.
+      // AM is the default.
+      interviewDate: this.formBuilder.control<Date | null>(null),
+      interviewTime: this.formBuilder.nonNullable.control('', [twelveHourTimeValidator]),
+      interviewMeridiem: this.formBuilder.nonNullable.control<Meridiem>('AM'),
     },
-    { validators: salaryRangeValidator },
+    { validators: [salaryRangeValidator, interviewDateTimeValidator] },
   );
+
+  /** The combo box's suggestions: the half-hour steps that match what is typed so far. */
+  protected readonly interviewTimes = computed(() => matchingTimes(this.typedInterviewTime()));
+  private readonly typedInterviewTime = toSignal(this.form.controls.interviewTime.valueChanges, {
+    initialValue: this.form.controls.interviewTime.value,
+  });
 
   constructor() {
     if (this.data.mode === 'edit') {
@@ -126,6 +148,7 @@ export class ApplicationDialog {
       source: value.source,
       appliedOn: value.appliedOn ? dateToIsoDate(value.appliedOn) : null,
       followUpOn: value.followUpOn ? dateToIsoDate(value.followUpOn) : null,
+      interviewAt: this.interviewInstant(value.interviewDate, value.interviewTime, value.interviewMeridiem),
     };
 
     this.saving.set(true);
@@ -181,6 +204,8 @@ export class ApplicationDialog {
   }
 
   private fillForm(application: Application): void {
+    // The saved instant, back in the user's local 12-hour clock: "7:30" + "PM"
+    const interview = application.interviewAt ? toTwelveHourTime(new Date(application.interviewAt)) : null;
     this.form.patchValue({
       company: application.company,
       role: application.role,
@@ -193,7 +218,16 @@ export class ApplicationDialog {
       source: application.source,
       appliedOn: isoDateToDate(application.appliedOn),
       followUpOn: isoDateToDate(application.followUpOn),
+      interviewDate: application.interviewAt ? new Date(application.interviewAt) : null,
+      interviewTime: interview?.time ?? '',
+      interviewMeridiem: interview?.meridiem ?? 'AM',
     });
+  }
+
+  /** The validators ran first, so a date always comes with a valid time here (or neither is set). */
+  private interviewInstant(date: Date | null, clockTime: string, meridiem: Meridiem): string | null {
+    const time = parseTwelveHourTime(clockTime, meridiem);
+    return date && time ? combineDateAndTime(date, time.hours, time.minutes) : null;
   }
 }
 

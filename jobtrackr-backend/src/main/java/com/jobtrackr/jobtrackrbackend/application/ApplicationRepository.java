@@ -5,7 +5,9 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -57,6 +59,54 @@ public interface ApplicationRepository
                          @Param("applicationId") Long applicationId,
                          @Param("statuses") Collection<ApplicationStatus> statuses,
                          @Param("today") LocalDate today);
+
+    // ---- Reminder emails (notification/ReminderEmailService) ----
+
+    // One user's interviews starting in [from, to), earliest first: the interview part of the morning digest
+    @Query("""
+            select a from Application a
+             where a.user.id = :userId
+               and a.status in :statuses
+               and a.interviewAt >= :from
+               and a.interviewAt < :to
+             order by a.interviewAt, a.id
+            """)
+    List<Application> findInterviewsBetween(@Param("userId") Long userId,
+                                            @Param("statuses") Collection<ApplicationStatus> statuses,
+                                            @Param("from") Instant from,
+                                            @Param("to") Instant to);
+
+    // Interviews of ALL users starting in (now, until] whose reminder has not been sent for their current
+    // time. Not scoped to one user: a scheduled job has no signed-in user. The owner is fetched in the same
+    // query because the email goes to their address. Users who switched reminder emails off are skipped;
+    // excludedEmail is the shared demo account.
+    @Query("""
+            select a from Application a join fetch a.user
+             where a.status in :statuses
+               and a.interviewAt > :now
+               and a.interviewAt <= :until
+               and (a.interviewReminderSentFor is null or a.interviewReminderSentFor <> a.interviewAt)
+               and a.user.emailRemindersEnabled = true
+               and a.user.email <> :excludedEmail
+             order by a.interviewAt, a.id
+            """)
+    List<Application> findInterviewsDueForReminder(@Param("statuses") Collection<ApplicationStatus> statuses,
+                                                   @Param("now") Instant now,
+                                                   @Param("until") Instant until,
+                                                   @Param("excludedEmail") String excludedEmail);
+
+    // Records that the reminder went out for this interview time. The "and interviewAt = :interviewAt" guard
+    // keeps a reminder due if the user moved the interview while the email was being sent. A bulk update does
+    // not bump @Version, so the job never makes the user's open edit form fail with a 409.
+    @Transactional
+    @Modifying
+    @Query("""
+            update Application a
+               set a.interviewReminderSentFor = :interviewAt
+             where a.id = :applicationId
+               and a.interviewAt = :interviewAt
+            """)
+    int markInterviewReminderSent(@Param("applicationId") Long applicationId, @Param("interviewAt") Instant interviewAt);
 
     // Moves a contiguous range of cards in one column up (-1) or down (+1) with a single UPDATE.
     // A bulk JPQL update does not bump @Version, so shifting neighbours never causes a 409 on them.

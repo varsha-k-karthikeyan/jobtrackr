@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 // Body of PUT /applications/{id}. Replaces every editable field.
@@ -26,6 +27,8 @@ public record UpdateApplicationRequest(
         @Size(max = 50) String source,
         LocalDate appliedOn,
         LocalDate followUpOn,
+        // Interview start as an exact instant; like every other field, leaving it out of a PUT clears it
+        Instant interviewAt,
         // The version the client last read; a mismatch means someone else saved first (409)
         @NotNull Integer version
 ) {

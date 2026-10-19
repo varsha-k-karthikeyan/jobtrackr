@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 // Body of POST /applications. There is deliberately no id, owner or position: the service assigns them.
@@ -23,6 +24,8 @@ public record CreateApplicationRequest(
         @DecimalMin("0") @Digits(integer = 3, fraction = 2) BigDecimal salaryMaxLpa,
         @Size(max = 50) String source,
         LocalDate appliedOn,
-        LocalDate followUpOn
+        LocalDate followUpOn,
+        // Interview start as an exact instant (ISO-8601 with an offset or Z); optional
+        Instant interviewAt
 ) {
 }

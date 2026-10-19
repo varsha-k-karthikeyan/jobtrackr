@@ -12,10 +12,10 @@ import { openApplicationDrawer } from '../../../shared/components/application-dr
 import { AuthService } from '../../auth/auth-service';
 import { DEMO_CREDENTIALS } from '../../auth/demo-credentials';
 import { Notifier } from '../../notifications/notifier';
-import { followUpLabel, NotificationStore } from '../../notifications/notification-store';
+import { followUpLabel, interviewLabel, NotificationStore } from '../../notifications/notification-store';
 import { ApplicationStore } from '../../state/application-store';
 
-// Layout for the signed-in part of the app: toolbar with the follow-up bell and the user menu, then the
+// Layout for the signed-in part of the app: toolbar with the notification bell and the user menu, then the
 // routed page.
 @Component({
   selector: 'app-shell',
@@ -50,12 +50,14 @@ export class Shell {
 
   protected readonly due = this.notifications.due;
   protected readonly upcoming = this.notifications.upcoming;
-  protected readonly dueCount = this.notifications.dueCount;
+  protected readonly interviews = this.notifications.interviews;
+  protected readonly badgeCount = this.notifications.badgeCount;
   protected readonly notificationsLabel = computed(() => {
-    const count = this.dueCount();
-    return count === 0 ? 'Follow-ups' : `Follow-ups, ${count} due`;
+    const count = this.badgeCount();
+    return count === 0 ? 'Notifications' : `Notifications, ${count} for today`;
   });
   protected readonly label = followUpLabel;
+  protected readonly interviewLabel = interviewLabel;
 
   constructor() {
     // Runs once on sign-in, then after every card change (a new follow-up date, a card moved to Offer)

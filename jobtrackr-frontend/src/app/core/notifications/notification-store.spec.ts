@@ -3,8 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../environments/environment';
-import { FollowUpNotification, Notifications } from '../models/notification.model';
-import { followUpLabel, NotificationStore } from './notification-store';
+import { FollowUpNotification, InterviewNotification, Notifications } from '../models/notification.model';
+import { followUpLabel, interviewLabel, NotificationStore } from './notification-store';
 
 const URL = `${environment.apiBaseUrl}/notifications`;
 
@@ -23,7 +23,12 @@ const notifications: Notifications = {
   today: '2026-10-15',
   due: [item(1, -3), item(2, 0)],
   upcoming: [item(3, 2)],
+  interviews: [interview(4, new Date(2026, 9, 15, 19, 45), 0), interview(5, new Date(2026, 9, 17, 10, 0), 2)],
 };
+
+function interview(applicationId: number, at: Date, daysUntil: number): InterviewNotification {
+  return { applicationId, company: `Company ${applicationId}`, role: 'Angular Developer', status: 'INTERVIEW', interviewAt: at.toISOString(), daysUntil };
+}
 
 describe('NotificationStore', () => {
   let store: NotificationStore;
@@ -46,13 +51,14 @@ describe('NotificationStore', () => {
 
   afterEach(() => http.verify());
 
-  it('loads due and upcoming follow-ups; only due ones count for the badge', async () => {
-    expect(store.dueCount()).toBe(0);
+  it('loads follow-ups and interviews; due follow-ups and today\'s interviews count for the badge', async () => {
+    expect(store.badgeCount()).toBe(0);
     await load();
 
     expect(store.due().map((notification) => notification.applicationId)).toEqual([1, 2]);
     expect(store.upcoming().map((notification) => notification.applicationId)).toEqual([3]);
-    expect(store.dueCount()).toBe(2);
+    expect(store.interviews().map((notification) => notification.applicationId)).toEqual([4, 5]);
+    expect(store.badgeCount()).toBe(3);
   });
 
   it('keeps the last list when a refresh fails, without throwing', async () => {
@@ -61,7 +67,7 @@ describe('NotificationStore', () => {
     http.expectOne(URL).flush(null, { status: 500, statusText: 'Server Error' });
     await loading;
 
-    expect(store.dueCount()).toBe(2);
+    expect(store.badgeCount()).toBe(3);
   });
 
   it('dismiss removes only that follow-up once the server agrees', async () => {
@@ -84,7 +90,8 @@ describe('NotificationStore', () => {
     request.flush(null, { status: 204, statusText: 'No Content' });
     await dismissing;
 
-    expect(store.dueCount()).toBe(0);
+    expect(store.due()).toHaveLength(0);
+    expect(store.badgeCount()).toBe(1); // today's interview still counts
     expect(store.upcoming()).toHaveLength(1);
   });
 
@@ -94,7 +101,15 @@ describe('NotificationStore', () => {
     http.expectOne(URL).flush(notifications);
     await loading;
 
-    expect(store.dueCount()).toBe(0);
+    expect(store.badgeCount()).toBe(0);
+  });
+});
+
+describe('interviewLabel', () => {
+  it('says today, tomorrow or the day, with the local time', () => {
+    expect(interviewLabel(interview(1, new Date(2026, 9, 15, 19, 45), 0))).toBe('Today · 7:45 PM');
+    expect(interviewLabel(interview(1, new Date(2026, 9, 16, 10, 0), 1))).toBe('Tomorrow · 10:00 AM');
+    expect(interviewLabel(interview(1, new Date(2026, 9, 22, 14, 30), 7))).toBe('Thu 22 Oct · 2:30 PM');
   });
 });
 

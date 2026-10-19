@@ -77,7 +77,7 @@ class ReminderEmailServiceTest {
         when(userRepository.findDueForDigest(DAY, DemoAccount.EMAIL)).thenReturn(List.of(user));
         when(applicationRepository.findOpenFollowUps(5L, NotificationService.NOTIFIED_STATUSES, DAY)).thenReturn(List.of(followUp));
         // From "now" (an interview at 07:30 is already over) to midnight India time
-        when(applicationRepository.findInterviewsBetween(5L, ReminderEmailService.INTERVIEW_STATUSES, now, Instant.parse("2026-10-20T18:30:00Z")))
+        when(applicationRepository.findInterviewsBetween(5L, NotificationService.INTERVIEW_STATUSES, now, Instant.parse("2026-10-20T18:30:00Z")))
                 .thenReturn(List.of(interview));
 
         assertThat(serviceAt("2026-10-20T03:00:00Z").sendDueDigests()).isEqualTo(1);
@@ -133,7 +133,7 @@ class ReminderEmailServiceTest {
         when(interview.getId()).thenReturn(42L);
         User owner = user(5L);
         when(interview.getUser()).thenReturn(owner);
-        when(applicationRepository.findInterviewsDueForReminder(ReminderEmailService.INTERVIEW_STATUSES, now, now.plus(Duration.ofMinutes(30)), DemoAccount.EMAIL))
+        when(applicationRepository.findInterviewsDueForReminder(NotificationService.INTERVIEW_STATUSES, now, now.plus(Duration.ofMinutes(30)), DemoAccount.EMAIL))
                 .thenReturn(List.of(interview));
 
         assertThat(serviceAt("2026-10-20T16:28:00Z").sendInterviewReminders()).isEqualTo(1);

@@ -2,10 +2,12 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { NotificationApiService } from '../api/notification-api-service';
 import { AuthService } from '../auth/auth-service';
-import { FollowUpNotification, Notifications } from '../models/notification.model';
+import { formatDate } from '@angular/common';
+import { FollowUpNotification, InterviewNotification, Notifications } from '../models/notification.model';
 
-// Follow-up reminders for the bell in the header. The server computes the list from the follow-up dates;
-// this store only holds the latest copy and applies dismissals.
+// The bell in the header: follow-ups and upcoming interviews. The server computes the lists from the cards;
+// this store only holds the latest copy and applies dismissals (follow-ups only: an interview leaves the list
+// by itself once it starts).
 @Injectable({ providedIn: 'root' })
 export class NotificationStore {
   private readonly api = inject(NotificationApiService);
@@ -16,8 +18,11 @@ export class NotificationStore {
 
   readonly due = computed<FollowUpNotification[]>(() => this.notificationsState()?.due ?? []);
   readonly upcoming = computed<FollowUpNotification[]>(() => this.notificationsState()?.upcoming ?? []);
-  /** The badge number: only due and overdue follow-ups count. */
-  readonly dueCount = computed(() => this.due().length);
+  readonly interviews = computed<InterviewNotification[]>(() => this.notificationsState()?.interviews ?? []);
+  /** The badge number: due and overdue follow-ups, plus interviews still ahead today. */
+  readonly badgeCount = computed(
+    () => this.due().length + this.interviews().filter((interview) => interview.daysUntil === 0).length,
+  );
 
   constructor() {
     inject(AuthService).onLogout(() => this.reset());
@@ -54,6 +59,18 @@ export class NotificationStore {
     this.session++;
     this.notificationsState.set(null);
   }
+}
+
+/** "Today · 7:45 PM", "Tomorrow · 10:00 AM", "Thu 22 Oct · 2:30 PM" (the time in the browser's zone). */
+export function interviewLabel(interview: InterviewNotification): string {
+  const time = formatDate(interview.interviewAt, 'h:mm a', 'en-US');
+  if (interview.daysUntil === 0) {
+    return `Today · ${time}`;
+  }
+  if (interview.daysUntil === 1) {
+    return `Tomorrow · ${time}`;
+  }
+  return `${formatDate(interview.interviewAt, 'EEE d MMM', 'en-US')} · ${time}`;
 }
 
 /** "Due today", "Due tomorrow", "Due in 3 days", "1 day overdue", "4 days overdue". */

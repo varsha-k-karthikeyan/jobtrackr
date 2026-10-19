@@ -132,7 +132,7 @@ An exception with no handler. The stack trace is in the application log. Find th
 | Login fails with correct details | `AuthService.login`; check the normalised email and that `password_hash` starts with `$2` |
 | A field is missing or null in the response | `ApplicationMapper`: was the field added to `toResponse`, `toEntity` and `applyUpdate`? |
 | A validation message is wrong | The annotations on the request record; then `GlobalExceptionHandler.handleMethodArgumentNotValid` |
-| The bell shows the wrong follow-ups or count | `NotificationService.getNotifications`; check `today` (decided in `notifications.zone`) and the rows from `findOpenFollowUps` |
+| The bell shows the wrong follow-ups, interviews or count | `NotificationService.getNotifications`; check `today` (decided in `notifications.zone`) and the rows from `findOpenFollowUps` and `findInterviewsBetween`. An interview that has started is gone on purpose; a Rejected card's interview is never listed |
 | A reminder email is wrong, missing or sent twice | `ReminderEmailService` (`sendInterviewReminders`, `sendDueDigests`); then the rows from `findInterviewsDueForReminder` / `findDueForDigest`. Two backends on one database send everything twice |
 | Old refresh-token or reset-link rows are not cleaned up | `ExpiredTokenCleanupJob.deleteExpiredTokens`; the log prints `Token cleanup deleted N expired refresh token(s) and M expired reset link(s)` each night. No line at all: `jobtrackr.scheduling.enabled` is false |
 

@@ -20,7 +20,7 @@ jobtrackr-backend/
     │   │   ├── user/                         the account entity, GET /me and the reminder-email switch
     │   │   ├── auth/                         register, login, JWT, security configuration
     │   │   ├── stats/                        counts per status and response rate (GET /stats)
-    │   │   ├── notification/                 follow-up reminders for the bell in the header (GET /notifications)
+    │   │   ├── notification/                 the bell in the header (GET /notifications) and the reminder emails
     │   │   └── common/                       shared pieces: current user, errors, paging, OpenAPI, CORS, clock, scheduling
     │   └── resources/
     │       ├── application.yml               all configuration
@@ -227,15 +227,16 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 
 ## 10. Follow-up notifications
 
-The bell in the app header lists follow-ups. The bell has no scheduled job behind it: `GET /api/v1/notifications` computes the list from the follow-up dates on every request, so it can never be out of step with the board. The same follow-ups, plus interviews, are also emailed (see "Reminder emails" below).
+The bell in the app header lists upcoming interviews and follow-ups. The bell has no scheduled job behind it: `GET /api/v1/notifications` computes the lists from the cards on every request, so they can never be out of step with the board. The same follow-ups, plus interviews, are also emailed (see "Reminder emails" below).
 
 | Endpoint | Does | Returns |
 |---|---|---|
-| `GET /notifications` | `today`, `due` (follow-up today or earlier, most overdue first) and `upcoming` (the next `notifications.upcoming-days` days). Each item has `applicationId`, `company`, `role`, `status`, `followUpOn` and `daysUntilDue` (0 today, negative overdue) | 200 |
+| `GET /notifications` | `today`, `due` (follow-up today or earlier, most overdue first) and `upcoming` (the next `notifications.upcoming-days` days). Each item has `applicationId`, `company`, `role`, `status`, `followUpOn` and `daysUntilDue` (0 today, negative overdue). `interviews`: the caller's interviews still ahead, from now to the end of the same window, earliest first, each with `applicationId`, `company`, `role`, `status`, `interviewAt` (instant) and `daysUntil` (0 today) | 200 |
 | `DELETE /notifications/{applicationId}` | Dismisses one due follow-up | 204; 404 for another user's card |
 | `DELETE /notifications` | Dismisses every due follow-up of the caller | 204 |
 
-- **Which cards:** status APPLIED or INTERVIEW (`NotificationService.NOTIFIED_STATUSES`) with a `follow_up_on`. Offer and Rejected are finished, so they are never listed.
+- **Which cards:** follow-ups of status APPLIED or INTERVIEW (`NotificationService.NOTIFIED_STATUSES`) with a `follow_up_on`; Offer and Rejected are finished, so they are never listed. Interviews of status APPLIED, INTERVIEW or OFFER (`INTERVIEW_STATUSES`, shared with the reminder emails) whose `interview_at` is still ahead.
+- **Interviews are never dismissed:** the query starts at "now", so one leaves the list as soon as it starts. The badge counts due follow-ups plus interviews whose `daysUntil` is 0, so an interview later today is visible in the app, not only by email. `daysUntil` compares calendar days in `notifications.zone` (23:30 tonight is 0, 00:30 tomorrow is 1).
 - **"Today" is decided in `notifications.zone` (Asia/Kolkata), not in the JVM's UTC.** A follow-up date is a calendar date: at 01:00 in India it is still yesterday in UTC, and a UTC "today" would show a follow-up a day late. The `Clock` bean keeps this testable.
 - **Dismissing** sets `reminder_dismissed_on` to today. A follow-up is listed while `reminder_dismissed_on IS NULL OR reminder_dismissed_on < follow_up_on`. `ApplicationService.update` clears the column when the follow-up date changes, so a rescheduled follow-up notifies again. Upcoming items cannot be dismissed (they are not due yet).
 - **Dismiss is a bulk JPQL update** (`ApplicationRepository.dismissFollowUps`), like `shiftPositions`: it does not bump `@Version`, so an edit form opened before the dismiss still saves without a 409. The same query handles one card or all of them (`:applicationId is null`). It is idempotent, as a DELETE should be.
@@ -257,7 +258,7 @@ Two emails, sent by `notification/ReminderEmailJob` through `ReminderEmailServic
 - **Marked only after a successful send**, with bulk JPQL updates that do not bump `@Version` (the user's open edit form never gets a 409 because of the job). The interview update also checks `interview_at = :interviewAt`, so a time changed during the send stays due. A failed send is retried on the next run; the worst case is a duplicate, never a lost email.
 - **No transaction around the loop:** a slow SMTP call must not hold a database transaction open, so each repository call commits on its own. One user's failure is logged (user and application ids, exception type) and the loop goes on.
 - **Not to the demo account:** anyone can use it, and its address is not an inbox we own (with a real provider the email would go to an outside domain). Both queries exclude `DemoAccount.EMAIL`, like the password-reset flow.
-- **Which interviews:** APPLIED, INTERVIEW or OFFER cards (`ReminderEmailService.INTERVIEW_STATUSES`; an offer can still have a final round). Rejected cards are never reminded.
+- **Which interviews:** APPLIED, INTERVIEW or OFFER cards (`NotificationService.INTERVIEW_STATUSES`, shared with the bell; an offer can still have a final round). Rejected cards are never reminded.
 - **Running two backends** against one database would send everything twice; run the second with `SCHEDULING_ENABLED=false`.
 
 ## 11. CORS

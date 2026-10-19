@@ -13,6 +13,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -126,7 +129,28 @@ class NotificationApiIntegrationTest {
         mockMvc.perform(get(BASE)).andExpect(jsonPath("$.due[*].company", contains("Acme")));
     }
 
+    @Test
+    void list_showsTheCallersInterviewsStillAhead_earliestFirst_butNotStartedOrRejectedOnes() throws Exception {
+        Instant now = Instant.now();
+        createInterview(userId, "InTwoDays", "INTERVIEW", now.plus(Duration.ofDays(2)));
+        createInterview(userId, "InAnHour", "APPLIED", now.plus(Duration.ofHours(1)));
+        createInterview(userId, "StartedAlready", "INTERVIEW", now.minus(Duration.ofMinutes(5)));
+        createInterview(userId, "NextMonth", "INTERVIEW", now.plus(Duration.ofDays(30)));
+        createInterview(userId, "Rejected", "REJECTED", now.plus(Duration.ofHours(2)));
+        createInterview(createUser(), "SomeoneElse", "INTERVIEW", now.plus(Duration.ofHours(1)));
+
+        mockMvc.perform(get(BASE))
+                .andExpect(jsonPath("$.interviews[*].company", contains("InAnHour", "InTwoDays")))
+                .andExpect(jsonPath("$.interviews[0].interviewAt").isNotEmpty())
+                .andExpect(jsonPath("$.interviews[0].applicationId").isNumber());
+    }
+
     // ---------- helpers ----------
+
+    private void createInterview(long ownerId, String company, String status, Instant interviewAt) {
+        jdbc.update("insert into applications (user_id, company, role, status, position, interview_at) values (?, ?, 'Engineer', ?, 0, ?)",
+                ownerId, company, status, Timestamp.from(interviewAt));
+    }
 
     private long createUser() {
         return jdbc.queryForObject("insert into users (email, password_hash, full_name) values (?, 'x', 'Notification Test') returning id",

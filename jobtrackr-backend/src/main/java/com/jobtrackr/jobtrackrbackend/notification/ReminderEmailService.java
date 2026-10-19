@@ -2,7 +2,6 @@ package com.jobtrackr.jobtrackrbackend.notification;
 
 import com.jobtrackr.jobtrackrbackend.application.Application;
 import com.jobtrackr.jobtrackrbackend.application.ApplicationRepository;
-import com.jobtrackr.jobtrackrbackend.application.ApplicationStatus;
 import com.jobtrackr.jobtrackrbackend.user.DemoAccount;
 import com.jobtrackr.jobtrackrbackend.user.User;
 import com.jobtrackr.jobtrackrbackend.user.UserRepository;
@@ -36,10 +35,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ReminderEmailService {
-
-    // Rejected interviews are not reminded; an Offer card can still have a final round
-    static final List<ApplicationStatus> INTERVIEW_STATUSES =
-            List.of(ApplicationStatus.APPLIED, ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER);
 
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
@@ -78,7 +73,7 @@ public class ReminderEmailService {
         Instant now = clock.instant();
         Instant until = now.plus(properties.interviewLeadTime());
         int sent = 0;
-        for (Application application : applicationRepository.findInterviewsDueForReminder(INTERVIEW_STATUSES, now, until, DemoAccount.EMAIL)) {
+        for (Application application : applicationRepository.findInterviewsDueForReminder(NotificationService.INTERVIEW_STATUSES, now, until, DemoAccount.EMAIL)) {
             try {
                 mailer.sendInterviewReminder(reminderFor(application, now));
                 applicationRepository.markInterviewReminderSent(application.getId(), application.getInterviewAt());
@@ -101,7 +96,7 @@ public class ReminderEmailService {
                 .toList();
         // Only interviews still ahead: one at 07:30 is already over when the 08:00 digest goes out
         List<ReminderDigest.InterviewLine> interviews = applicationRepository
-                .findInterviewsBetween(user.getId(), INTERVIEW_STATUSES, now, endOfToday).stream()
+                .findInterviewsBetween(user.getId(), NotificationService.INTERVIEW_STATUSES, now, endOfToday).stream()
                 .map(application -> new ReminderDigest.InterviewLine(application.getCompany(), application.getRole(),
                         application.getInterviewAt().atZone(zone)))
                 .toList();

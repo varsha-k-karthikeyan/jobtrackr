@@ -1,6 +1,6 @@
 # JobTrackr frontend
 
-Angular 22 single-page app for JobTrackr: a Kanban board with drag and drop, a searchable list, a details drawer with notes, stats, and a follow-up bell in the header. Standalone components, Signals, Angular Material and Tailwind CSS.
+Angular 22 single-page app for JobTrackr: a Kanban board with drag and drop, a searchable list, a details drawer with notes, stats, and a notification bell (interviews and follow-ups) in the header. Standalone components, Signals, Angular Material and Tailwind CSS.
 
 Project-wide documentation (setup, backend architecture, debugging, commit rules) lives at the monorepo root: see [../README.md](../README.md) and [../docs](../docs).
 
@@ -34,9 +34,9 @@ src/app/
 │   ├── auth/                  AuthService (signals), token storage, demo credentials
 │   ├── guards/                authGuard, guestGuard, safeReturnUrl
 │   ├── interceptors/          authInterceptor (Bearer + 401), errorInterceptor (snackbar)
-│   ├── layout/shell/          toolbar, follow-up bell, user menu, Board/List tabs, router outlet
+│   ├── layout/shell/          toolbar, notification bell, user menu, Board/List tabs, router outlet
 │   ├── models/                TypeScript mirrors of the backend's DTO records
-│   ├── notifications/         Notifier (lazily loaded snackbar), NotificationStore (follow-up bell)
+│   ├── notifications/         Notifier (lazily loaded snackbar), NotificationStore (the bell: interviews and follow-ups)
 │   ├── state/                 ApplicationStore + pure board transforms (board-state.ts)
 │   └── testing/               builders shared by unit tests
 ├── features/                  one folder per page area, lazy-loaded by the router
@@ -64,7 +64,7 @@ component ──calls──▶ ApplicationStore ──▶ ApplicationApiService 
 - **Optimistic drag and drop:** `store.move()` updates the board at once, sends `PATCH /move`, takes the server's copy (new `version`) on success, rolls back on failure, and reloads the board on 404/409.
 - **The stats strip is derived** from the store's counts: no request, and it updates instantly after create, delete and move. Same formula as the backend's `GET /stats`.
 - **The list page** keeps search, status, sort and page in the URL, so refresh, back/forward and shared links restore the view. It fetches pages directly through `ApplicationApiService.list()`: a page of search results is a view of the server, not shared state.
-- **Follow-up bell:** `NotificationStore` holds the server's `GET /notifications` result (`due`, `upcoming`, `dueCount` for the badge). The shell reloads it on sign-in, whenever the menu opens, and after every board change: `ApplicationStore.revision` is bumped after each successful create, update, delete or move, and an `effect` in the shell watches it. That keeps the board store free of any knowledge of notifications. The server decides what is due (in its configured zone), so the client does no date arithmetic. Clicking an item opens the details drawer; dismiss calls `DELETE /notifications/{id}`.
+- **Notification bell:** `NotificationStore` holds the server's `GET /notifications` result (`interviews`, `due`, `upcoming`; `badgeCount` = due follow-ups + interviews whose `daysUntil` is 0). The menu lists Interviews (time in the browser's zone via `interviewLabel`: "Today · 7:45 PM"; no dismiss button, the server drops an interview once it starts), then Follow-ups due (with Dismiss all), then Upcoming follow-ups. The shell reloads it on sign-in, whenever the menu opens, and after every board change: `ApplicationStore.revision` is bumped after each successful create, update, delete or move, and an `effect` in the shell watches it. That keeps the board store free of any knowledge of notifications. The server decides what is due (in its configured zone), so the client does no date arithmetic. Clicking an item opens the details drawer; dismiss calls `DELETE /notifications/{id}`.
 - **On logout** the store resets (registered through `AuthService.onLogout`), and responses that arrive after a logout are dropped, so one user's data never shows for the next.
 
 ## Styling

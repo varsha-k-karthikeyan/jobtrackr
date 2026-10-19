@@ -8,7 +8,7 @@
 
     <span class="flex-1"></span>
 
-    <!-- Follow-up reminders. Opening the menu refreshes the list (the date may have rolled over). -->
+    <!-- Interviews and follow-ups. Opening the menu refreshes the lists (the date may have rolled over). -->
     <button
       mat-icon-button
       [matMenuTriggerFor]="notificationMenu"
@@ -16,26 +16,47 @@
       [attr.aria-label]="notificationsLabel()"
     >
       <mat-icon
-        [matBadge]="dueCount()"
-        [matBadgeHidden]="dueCount() === 0"
+        [matBadge]="badgeCount()"
+        [matBadgeHidden]="badgeCount() === 0"
         aria-hidden="false"
         >notifications</mat-icon
       >
     </button>
     <mat-menu #notificationMenu="matMenu" xPosition="before">
       <!-- stopPropagation: a click on the panel would otherwise close the menu -->
-      <div class="flex min-h-12 items-center justify-between gap-2 pl-4 pr-2" (click)="$event.stopPropagation()">
-        <span class="text-sm font-semibold">Follow-ups</span>
-        @if (due().length > 1) {
-          <button mat-button (click)="dismissAll()">Dismiss all</button>
-        }
+      <div class="flex min-h-12 items-center pl-4 pr-2" (click)="$event.stopPropagation()">
+        <span class="text-sm font-semibold">Notifications</span>
       </div>
       <mat-divider />
 
-      @if (due().length === 0 && upcoming().length === 0) {
-        <p class="m-0 px-4 py-3 text-sm opacity-70">No follow-ups in the next 7 days.</p>
+      @if (interviews().length === 0 && due().length === 0 && upcoming().length === 0) {
+        <p class="m-0 px-4 py-3 text-sm opacity-70">No interviews or follow-ups in the next 7 days.</p>
       }
 
+      <!-- Interviews first: they happen at a fixed time. No dismiss: one leaves the list once it starts. -->
+      @if (interviews().length > 0) {
+        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Interviews</div>
+        @for (item of interviews(); track item.applicationId) {
+          <button mat-menu-item (click)="openApplication(item.applicationId)">
+            <span class="block w-60">
+              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
+              <span class="block text-xs" [class.interview-today]="item.daysUntil === 0">{{ interviewLabel(item) }}</span>
+            </span>
+          </button>
+        }
+      }
+
+      @if (due().length > 0) {
+        @if (interviews().length > 0) {
+          <mat-divider />
+        }
+        <div class="flex min-h-10 items-center justify-between gap-2 pl-4 pr-2" (click)="$event.stopPropagation()">
+          <span class="text-xs font-semibold uppercase tracking-wide opacity-70">Follow-ups due</span>
+          @if (due().length > 1) {
+            <button mat-button (click)="dismissAll()">Dismiss all</button>
+          }
+        </div>
+      }
       @for (item of due(); track item.applicationId) {
         <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center pr-1">
           <button mat-menu-item (click)="openApplication(item.applicationId)">
@@ -58,8 +79,10 @@
       }
 
       @if (upcoming().length > 0) {
-        <mat-divider />
-        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Upcoming</div>
+        @if (interviews().length > 0 || due().length > 0) {
+          <mat-divider />
+        }
+        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Upcoming follow-ups</div>
         @for (item of upcoming(); track item.applicationId) {
           <button mat-menu-item (click)="openApplication(item.applicationId)">
             <!-- No dismiss button here, so the text can use the full panel width (280px minus padding) -->

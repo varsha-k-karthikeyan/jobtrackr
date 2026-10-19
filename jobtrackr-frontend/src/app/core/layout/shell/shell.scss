@@ -7,3 +7,9 @@
 .follow-up-overdue {
   color: var(--mat-sys-error);
 }
+
+// Today's interviews in the bell menu stand out in the theme's primary colour
+.interview-today {
+  color: var(--mat-sys-primary);
+  font-weight: 500;
+}

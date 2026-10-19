@@ -6,6 +6,7 @@ import com.jobtrackr.jobtrackrbackend.application.ApplicationStatus;
 import com.jobtrackr.jobtrackrbackend.common.CurrentUserProvider;
 import com.jobtrackr.jobtrackrbackend.common.exception.NotFoundException;
 import com.jobtrackr.jobtrackrbackend.notification.dto.FollowUpNotification;
+import com.jobtrackr.jobtrackrbackend.notification.dto.InterviewNotification;
 import com.jobtrackr.jobtrackrbackend.notification.dto.NotificationsResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,21 @@ class NotificationServiceTest {
     }
 
     @Test
+    void getNotifications_listsInterviewsFromNowToTheEndOfTheWindow_withDaysCountedInIndia() {
+        // Now is 01:30 on the 15th in India; the window ends at midnight after the 22nd, India time
+        Application tonight = interview(20L, "Zoho", Instant.parse("2026-10-15T17:30:00Z"));   // 23:00 on the 15th
+        Application tomorrow = interview(21L, "Swiggy", Instant.parse("2026-10-15T19:00:00Z")); // 00:30 on the 16th
+        when(applicationRepository.findInterviewsBetween(USER_ID, NotificationService.INTERVIEW_STATUSES,
+                Instant.parse("2026-10-14T20:00:00Z"), Instant.parse("2026-10-22T18:30:00Z")))
+                .thenReturn(List.of(tonight, tomorrow));
+
+        NotificationsResponse response = service.getNotifications();
+
+        assertThat(response.interviews()).extracting(InterviewNotification::company, InterviewNotification::daysUntil)
+                .containsExactly(tuple("Zoho", 0L), tuple("Swiggy", 1L));
+    }
+
+    @Test
     void dismiss_ownCard_dismissesOnlyThatCardForToday() {
         when(applicationRepository.findByIdAndUserId(10L, USER_ID)).thenReturn(Optional.of(mock(Application.class)));
 
@@ -103,6 +119,14 @@ class NotificationServiceTest {
         service.dismissAll();
 
         verify(applicationRepository).dismissFollowUps(USER_ID, null, NotificationService.NOTIFIED_STATUSES, TODAY);
+    }
+
+    private static Application interview(Long id, String company, Instant interviewAt) {
+        Application application = mock(Application.class);
+        when(application.getId()).thenReturn(id);
+        when(application.getCompany()).thenReturn(company);
+        when(application.getInterviewAt()).thenReturn(interviewAt);
+        return application;
     }
 
     private static Application application(Long id, String company, LocalDate followUpOn) {

@@ -125,7 +125,7 @@ The short version; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the rea
 2. Add the field to the entity with a matching `@Column`.
 3. Add it to the request and response records, with validation that mirrors the column limits.
 4. Add it to the mapper (`toResponse`, `toEntity`, `applyUpdate`).
-5. Extend the tests, then run `.\mvnw.cmd test`.
+5. Extend the tests, then run `.\mvnw.cmd verify` (Docker Desktop running; no compose database needed).
 
 If the app then fails to start with `Schema-validation`, the entity and the migration disagree.
 
@@ -145,7 +145,7 @@ Create `com.jobtrackr.jobtrackrbackend.<feature>` with entity, repository, servi
 
 ```powershell
 cd "E:\JobTrackr project\jobtrackr-backend"
-.\mvnw.cmd test
+.\mvnw.cmd verify   # needs Docker Desktop (Testcontainers), not the compose database
 
 # If the frontend changed
 cd "E:\JobTrackr project\jobtrackr-frontend"

@@ -1,16 +1,15 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
+import com.jobtrackr.jobtrackrbackend.IntegrationTest;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -34,8 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // (no SMTP). NOT @Transactional, unlike the other integration tests: the email is sent only AFTER COMMIT,
 // and a test transaction that rolls back never commits. So data really is written, and each test deletes
 // its own user at the end (ON DELETE CASCADE removes its tokens).
-@SpringBootTest
-@ActiveProfiles("test")
+@IntegrationTest
 class PasswordResetApiIntegrationTest {
 
     private static final String PASSWORD = "S3cret@Pass";

@@ -136,6 +136,18 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Integration tests get their own throwaway PostgreSQL 16 in Docker (random port), wired in through
+             @ServiceConnection. Versions come from Boot's dependency management (Testcontainers 2.x module names). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -148,9 +160,33 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- Tests don't go through main(), so set the same UTC default zone here -->
-                    <argLine>-Duser.timezone=UTC</argLine>
+                    <!-- Tests don't go through main(), so set the same UTC default zone here.
+                         @{argLine} keeps the JaCoCo agent that prepare-agent puts into that property;
+                         a plain <argLine> would silently replace it and the report would show 0%. -->
+                    <argLine>@{argLine} -Duser.timezone=UTC</argLine>
                 </configuration>
+            </plugin>
+            <!-- Coverage report for quoting numbers; deliberately no failing threshold.
+                 Open target/site/jacoco/index.html after `mvnw verify`. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.15</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <!-- Registers Lombok as an annotation processor for main and test code; without it the generated getters and constructors do not exist -->
             <plugin>

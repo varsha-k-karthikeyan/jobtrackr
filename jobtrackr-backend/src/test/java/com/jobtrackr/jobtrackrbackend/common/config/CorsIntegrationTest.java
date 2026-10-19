@@ -1,11 +1,10 @@
 package com.jobtrackr.jobtrackrbackend.common.config;
 
+import com.jobtrackr.jobtrackrbackend.IntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -19,8 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // Simulates what a browser does before a cross-origin call: a preflight OPTIONS request with no token.
 // Runs through the real security filter chain, because that is where CORS must be handled.
-@SpringBootTest
-@ActiveProfiles("test")
+@IntegrationTest
 class CorsIntegrationTest {
 
     private static final String FRONTEND_ORIGIN = "http://localhost:4200";

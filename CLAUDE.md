@@ -23,7 +23,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 - Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Mail (password-reset links, caught locally by Mailpit), Lombok
 - springdoc-openapi 3.x for Swagger UI (the 3.x line is the one for Boot 4; its version is pinned in `pom.xml`)
 - PostgreSQL 16 in Docker (`docker-compose.yml` at this root)
-- Tests: JUnit 5, Mockito, AssertJ, MockMvc
+- Tests: JUnit 5, Mockito, AssertJ, MockMvc, Testcontainers (PostgreSQL 16), JaCoCo coverage report
 - Frontend: `jobtrackr-frontend` — Angular 22 (standalone, zoneless, OnPush by default), Angular Material 22 + CDK, Tailwind CSS 4, Vitest. Needs Node 22.22.3+ or 24.15+
 - Base package: `com.jobtrackr.jobtrackrbackend`
 
@@ -42,8 +42,9 @@ docker compose up -d
 cd "E:\JobTrackr project\jobtrackr-backend"
 .\mvnw.cmd spring-boot:run        # or: mvn spring-boot:run
 
-# 3. Tests (the Docker database must be running; tests use their own dummy JWT secret)
-.\mvnw.cmd test
+# 3. Tests. Docker Desktop must be running: Testcontainers starts its own PostgreSQL 16 on a random port,
+#    so the compose database is NOT needed (and a local PostgreSQL on 5432 does not interfere).
+.\mvnw.cmd verify                 # all tests + coverage report: target\site\jacoco\index.html
 
 # 4. Frontend (the backend must be running on :8080)
 cd "E:\JobTrackr project\jobtrackr-frontend"
@@ -99,6 +100,7 @@ npm test           # unit tests (Vitest)
 - A locally installed PostgreSQL service on port 5432 hides the Docker container and causes "password authentication failed". Stop the Windows service before starting the container.
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
 - Password-reset emails go to the Mailpit container (SMTP localhost:1025), which delivers nothing; read them at http://localhost:8025. If it is not running, the send fails with only a warning in the log (the request still answers 204). Tests mock `PasswordResetMailer` and never send.
+- Integration tests are annotated `@IntegrationTest` (Spring Boot test + "test" profile + the shared Testcontainers PostgreSQL). A plain `@SpringBootTest` would try localhost:5432 instead. Surefire's `argLine` must keep `@{argLine}` first, or JaCoCo's agent is dropped and coverage reads 0%.
 - Scheduled jobs (`ExpiredTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.

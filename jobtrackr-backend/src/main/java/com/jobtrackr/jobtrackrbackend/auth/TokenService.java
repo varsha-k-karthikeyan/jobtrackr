@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Instant;
 
 // Builds and signs the JWT access token. The matching verification is the JwtDecoder bean in SecurityConfig.
@@ -21,9 +22,11 @@ public class TokenService {
 
     private final JwtEncoder jwtEncoder;
     private final JwtProperties jwtProperties;
+    private final Clock clock;
 
     public AuthResponse issueAccessToken(User user) {
-        Instant now = Instant.now();
+        // From the injected Clock like every other time-dependent class, so tests can pin "now"
+        Instant now = clock.instant();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)

@@ -1,5 +1,6 @@
 package com.jobtrackr.jobtrackrbackend.application;
 
+import com.jobtrackr.jobtrackrbackend.IntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import com.jobtrackr.jobtrackrbackend.common.CurrentUserProvider;
 import com.jobtrackr.jobtrackrbackend.user.User;
@@ -9,8 +10,6 @@ import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,8 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 // Full stack against the real Postgres: controller -> service -> repository -> SQL.
 // Each test runs as a brand-new user inside a transaction that is rolled back, so no data is left behind.
-@SpringBootTest
-@ActiveProfiles("test") // loads application-test.yml (test-only JWT secret)
+@IntegrationTest
 @Transactional
 class ApplicationApiIntegrationTest {
 
@@ -320,6 +318,55 @@ class ApplicationApiIntegrationTest {
     }
 
     @Test
+    void anotherUsersApplication_is404OnEveryEndpoint_andStaysUnchanged() throws Exception {
+        long ownersCard = create("Acme", "APPLIED");
+        Long ownerId = currentUser.getUserId();
+        actAs(newUser());
+
+        mockMvc.perform(get(BASE + "/{id}", ownersCard)).andExpect(status().isNotFound());
+        mockMvc.perform(put(BASE + "/{id}", ownersCard).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"company\": \"Hacked\", \"role\": \"Engineer\", \"version\": 0}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch(BASE + "/{id}/move", ownersCard).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"OFFER\", \"position\": 0}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post(BASE + "/{id}/notes", ownersCard).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\": \"not mine\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete(BASE + "/{id}", ownersCard)).andExpect(status().isNotFound());
+        // Not even visible as a list or board entry
+        mockMvc.perform(get(BASE)).andExpect(jsonPath("$.content", hasSize(0)));
+        mockMvc.perform(get(BASE + "/board")).andExpect(jsonPath("$.APPLIED", hasSize(0)));
+
+        sync();
+        actAs(ownerId);
+        mockMvc.perform(get(BASE + "/{id}", ownersCard))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.application.company").value("Acme"))
+                .andExpect(jsonPath("$.application.status").value("APPLIED"))
+                .andExpect(jsonPath("$.application.version").value(0))
+                .andExpect(jsonPath("$.notes", hasSize(0)));
+    }
+
+    @Test
+    void anotherUsersNote_cannotBeDeleted() throws Exception {
+        long card = create("Acme", "APPLIED");
+        String noteResponse = mockMvc.perform(post(BASE + "/{id}/notes", card).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\": \"Phone screen booked\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long noteId = ((Number) JsonPath.read(noteResponse, "$.id")).longValue();
+        Long ownerId = currentUser.getUserId();
+        actAs(newUser());
+
+        mockMvc.perform(delete("/api/v1/notes/{id}", noteId)).andExpect(status().isNotFound());
+
+        sync();
+        actAs(ownerId);
+        mockMvc.perform(get(BASE + "/{id}", card)).andExpect(jsonPath("$.notes", hasSize(1)));
+    }
+
+    @Test
     void openApiDocs_areServed() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -334,6 +381,16 @@ class ApplicationApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(response, "$.id")).longValue();
+    }
+
+    /** A second, independent account in the same (rolled-back) transaction. */
+    private Long newUser() {
+        return userRepository.save(new User("other-" + UUID.randomUUID() + "@jobtrackr.dev", "x", "Other User")).getId();
+    }
+
+    /** Every following request is made as this user (what the JWT subject would say). */
+    private void actAs(Long userId) {
+        when(currentUser.getUserId()).thenReturn(userId);
     }
 
     private void createJson(String json) throws Exception {

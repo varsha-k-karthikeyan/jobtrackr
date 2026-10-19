@@ -98,10 +98,12 @@ Open http://localhost:4200 and click **Try the demo**, or register your own acco
 
 ```powershell
 cd "E:\JobTrackr project\jobtrackr-backend"
-.\mvnw.cmd test
+.\mvnw.cmd verify
 ```
 
-The Docker database must be running. Integration tests run inside transactions that are rolled back, so they leave no data behind. Tests use their own dummy JWT secret and need no environment variable, and background jobs are switched off during tests.
+Docker Desktop must be running, but the compose database is **not** needed: the integration tests start their own throwaway PostgreSQL 16 with [Testcontainers](https://testcontainers.com/) on a random port (the first run downloads the image). Integration tests run inside transactions that are rolled back, so they leave no data behind. Tests use their own dummy JWT secret and need no environment variable, and background jobs are switched off during tests.
+
+`verify` also writes a coverage report to `jobtrackr-backend/target/site/jacoco/index.html` (open it in a browser: `start target\site\jacoco\index.html`).
 
 Frontend unit tests (Vitest) need neither the backend nor the database:
 

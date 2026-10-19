@@ -198,7 +198,10 @@ $part += '=' * ((4 - $part.Length % 4) % 4)
 
 | Symptom | Cause |
 |---|---|
-| Every `@SpringBootTest` fails with a connection error | The Docker database is not running. Unit tests still pass |
+| Every integration test fails with `Could not find a valid Docker environment` | Docker Desktop is not running. Testcontainers needs it (the compose database does not). Unit tests still pass |
+| The first `mvnw verify` hangs for a minute | Testcontainers is downloading `postgres:16` and its `ryuk` helper once; later runs reuse the images |
+| A new test class connects to localhost:5432 (or fails with "password authentication failed") | It uses `@SpringBootTest` instead of `@IntegrationTest`, so it never got the Testcontainers database |
+| The JaCoCo report shows 0% | Surefire's `<argLine>` lost `@{argLine}` at its start, which carries the JaCoCo agent |
 | `Could not resolve placeholder 'JWT_SECRET'` in a test | The test class is missing `@ActiveProfiles("test")` |
 | An integration test reads old positions after a move or delete | The whole test shares one transaction and one persistence context, and bulk updates bypass it. Call `entityManager.flush(); entityManager.clear();` before reading (see `sync()` in `ApplicationApiIntegrationTest`) |
 | `UnnecessaryStubbingException` | A `when(...)` in the test is never used by that test. Remove it, or mark shared setup stubs `lenient()` |

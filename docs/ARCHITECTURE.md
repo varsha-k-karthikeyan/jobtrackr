@@ -90,13 +90,14 @@ Any exception thrown in the controller or below is converted to JSON by `common/
 
 ## 4. Data model
 
-Defined in `db/migration/V1__init.sql` and later migrations (V5 refresh tokens, V6/V7 the notification column; V8 dropped the `resumes` and `match_results` tables that V1 had reserved for an AI resume match, which was taken out of scope). Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
+Defined in `db/migration/V1__init.sql` and later migrations (V5 refresh tokens, V6/V7 the notification column; V8 dropped the `resumes` and `match_results` tables that V1 had reserved for an AI resume match, which was taken out of scope; V9 password-reset links). Column-level explanations are stored in the database by `V3__schema_comments.sql`; in psql run `\d+ applications` to read them.
 
 ```mermaid
 erDiagram
     users ||--o{ applications : owns
     applications ||--o{ notes : has
     users ||--o{ refresh_tokens : "signed in with"
+    users ||--o{ password_reset_tokens : "can reset with"
 ```
 
 | Table | Java entity | Notes |
@@ -105,6 +106,7 @@ erDiagram
 | `applications` | `application/Application` | One row per card. `(user_id, status, position)` is its place on the board. `version` is the optimistic-lock counter. `reminder_dismissed_on` (V6, renamed in V7) is internal to the notification feature and in no DTO |
 | `notes` | `note/Note` | No `user_id`; the owner is the owner of the parent application |
 | `refresh_tokens` | `auth/RefreshToken` | Added by V5. Hash only, never the token. Rows expired over 7 days ago are deleted nightly (section 8) |
+| `password_reset_tokens` | `auth/PasswordResetToken` | Added by V9. Hash only. Unused emailed links: deleted on use, on a new request, or nightly once expired (section 8) |
 
 Deletion is handled by the database, not by JPA: deleting a user removes their applications, deleting an application removes its notes (`ON DELETE CASCADE`). That is why the entities have no `@OneToMany` collections and no JPA cascade settings.
 
@@ -124,7 +126,7 @@ This is the most important rule in the codebase.
 
 When adding a query, ask: "where is `user_id` in the WHERE clause?" If the answer is "nowhere", it is a bug.
 
-The one deliberate exception is `RefreshTokenRepository.deleteExpiredBefore`, called only by the nightly cleanup job: it has no logged-in user and an expired row is useless to everyone. It is never reachable from a controller.
+The deliberate exceptions have no logged-in user by nature: `RefreshTokenRepository.deleteExpiredBefore` and `PasswordResetTokenRepository.deleteExpiredBefore`, called only by the nightly cleanup job (an expired row is useless to everyone), and the password-reset flow, which runs before anyone is signed in and identifies the user by the email address (request) or by the hashed token (reset) instead of `CurrentUserProvider`.
 
 ## 6. Card ordering and the move algorithm
 
@@ -203,8 +205,15 @@ Stateless JWT, using Spring's OAuth2 resource server support. All of it is in `a
 - **`POST /api/v1/auth/logout`** revokes the refresh token and deletes the cookie. The access token still works until it expires (it is stateless), which is why it is kept short.
 - **CORS** allows credentials, which the cookie needs across ports (`localhost:4200` to `:8080`); that is only permitted because the allowed origins are an explicit list. `SameSite=Strict` works locally because ports do not make a different site; a frontend and API on different domains would need `SameSite=None; Secure` plus CSRF protection.
 - **Frontend:** a 401 from a protected endpoint triggers one shared refresh and a single retry of the original request; only if the refresh fails is the user logged out. After a reload with an expired access token, the route guards restore the session from the cookie. Details in [jobtrackr-frontend/README.md](../jobtrackr-frontend/README.md).
-- **Cleanup:** `RefreshTokenCleanupJob` runs nightly (`jobtrackr.refresh-token-cleanup.cron`, default 03:30 India time) and deletes, in one bulk DELETE, rows that expired more than 7 days ago (`RefreshTokenService.EXPIRED_TOKEN_RETENTION`). Revoked rows that have not expired are kept: they are the evidence reuse detection needs, and the 7-day margin keeps that alarm working for a stolen copy replayed just after expiry. Scheduling can be switched off with `jobtrackr.scheduling.enabled=false` (tests do).
+- **Cleanup:** `ExpiredTokenCleanupJob` runs nightly (`jobtrackr.token-cleanup.cron`, default 03:30 India time). It deletes, in one bulk DELETE each, refresh-token rows that expired more than 7 days ago (`RefreshTokenService.EXPIRED_TOKEN_RETENTION`) and every expired password-reset link (no margin: an unused link has no later use). Revoked rows that have not expired are kept: they are the evidence reuse detection needs, and the 7-day margin keeps that alarm working for a stolen copy replayed just after expiry. Scheduling can be switched off with `jobtrackr.scheduling.enabled=false` (tests do).
 - **Password change** (`PUT /api/v1/me/password`, under `/me` because `/auth/**` is public). A wrong current password is a **400 field error** (`errors.currentPassword`), not a 401: the frontend reads any 401 as an expired session and would refresh instead of showing the message. The new password follows `PasswordPolicy` and must differ from the old one. Every refresh-token row of the user is then **deleted, not revoked**: a revoked token presented after the 30-second grace period counts as theft and would revoke the fresh session too, whereas a deleted one is just unknown (plain 401). Other devices are therefore logged out at their next refresh, and their access tokens keep working for at most 15 minutes. The response carries a new access token and refresh cookie. The public demo account gets a 403 (`user/DemoAccount`).
+- **Forgot password** (`POST /api/v1/auth/forgot-password`, then `POST /api/v1/auth/reset-password`; `PasswordResetService`):
+  - **No account enumeration.** `forgot-password` always answers 204. For an unknown address, the demo account, or a repeat within `resend-cooldown` (1 minute, so the endpoint cannot flood an inbox) it silently does nothing.
+  - **The email is sent after commit and off the request thread**: the service publishes `PasswordResetRequested`; `PasswordResetEmailListener` is `@TransactionalEventListener(AFTER_COMMIT)` and `@Async`. So a link is never emailed for a token that was rolled back, and a registered address does not answer more slowly than an unknown one. A failed send is logged with the user id and exception type only.
+  - **The token** is a random 256-bit value (`OpaqueTokens`, shared with refresh tokens); only its SHA-256 is stored in `password_reset_tokens` (V9). It works once (the row is deleted on use), expires after `token-ttl` (30 minutes), and a new request deletes older links, so only the newest works.
+  - **The link's base URL comes from `jobtrackr.password-reset.app-url`, never from the request's Host header**: a forged Host would otherwise produce a genuine email pointing at an attacker's site (host-header injection).
+  - **Reset** looks the token up with `SELECT ... FOR UPDATE` (two clicks cannot both use it), checks expiry, stores the new BCrypt hash, deletes the user's reset links and ends every session (`RefreshTokenService.endAllSessions`). No session is started: the user logs in. A used, expired or unknown link is a **400** (`BadRequestException`), not a 401.
+  - **Mail:** `PasswordResetMailer` sends plain text and HTML (the user-typed name is HTML-escaped) through `JavaMailSender`. Locally that is Mailpit (`docker-compose.yml`, SMTP 1025, inbox http://localhost:8025), which delivers nothing; real delivery is a matter of `MAIL_*` environment variables.
 - **Not done (known limitation):** there is no "log out everywhere" button, although the reuse detection already does exactly that internally.
 - Restarting with a different `JWT_SECRET` invalidates every token issued before.
 
@@ -255,6 +264,7 @@ Every error body is an RFC 9457 `ProblemDetail` (`status`, `title`, `detail`, so
 | 400 | Unreadable JSON, unknown enum value, wrong date format; no `errors` map | Spring MVC, before validation |
 | 400 | `sort` names a field that is not whitelisted | `ApplicationService.list` |
 | 400 | A rule only the service can check, e.g. "Current password is incorrect"; same `errors` map shape as Bean Validation | `FieldValidationException` |
+| 400 | A password-reset link that is used, expired or unknown; message in `detail` | `BadRequestException` |
 | 401 | Wrong email or password | `AuthService.login` |
 | 401 | Missing, expired or tampered token; **empty body**, reason in the `WWW-Authenticate` header | Security filter, before any controller |
 | 403 | Signed in, but not allowed: changing the demo account's password | `ForbiddenException` |
@@ -280,7 +290,11 @@ All in `src/main/resources/application.yml`.
 | `jobtrackr.jwt.refresh-token-ttl` | `14d` | How long a session survives without use; rotated on every refresh |
 | `jobtrackr.jwt.refresh-cookie-secure` | `${REFRESH_COOKIE_SECURE:false}` | The cookie's `Secure` flag; `false` for `http://localhost`, `true` wherever the API is served over HTTPS |
 | `jobtrackr.scheduling.enabled` | `${SCHEDULING_ENABLED:true}` | Turns background jobs on (`common/config/SchedulingConfig`); `false` in tests |
-| `jobtrackr.refresh-token-cleanup.cron` / `.zone` | `0 30 3 * * *`, `Asia/Kolkata` | When the expired refresh-token cleanup runs (cron overridable with `REFRESH_TOKEN_CLEANUP_CRON`) |
+| `jobtrackr.token-cleanup.cron` / `.zone` | `0 30 3 * * *`, `Asia/Kolkata` | When expired refresh tokens and reset links are deleted (cron overridable with `TOKEN_CLEANUP_CRON`) |
+| `jobtrackr.password-reset.app-url` | `${APP_URL:http://localhost:4200}` | Base URL of the emailed reset link; never derived from the request |
+| `jobtrackr.password-reset.from` | `${MAIL_FROM:JobTrackr <no-reply@jobtrackr.local>}` | Sender of the reset email |
+| `jobtrackr.password-reset.token-ttl` / `.resend-cooldown` | `30m`, `1m` | How long a link works; minimum gap between two emails to one account |
+| `spring.mail.*` | `${MAIL_HOST:localhost}`, `${MAIL_PORT:1025}`, no auth, no TLS | The Mailpit container by default; a real provider through `MAIL_*` variables only |
 | `jobtrackr.cors.allowed-origins` | `${CORS_ALLOWED_ORIGINS:http://localhost:4200}` | Browser origins allowed to call the API |
 | `notifications.zone` | `${NOTIFICATIONS_ZONE:Asia/Kolkata}` | The zone in which "today" is decided for follow-up dates |
 | `notifications.upcoming-days` | `7` | How far ahead the bell lists upcoming follow-ups (0 to 30) |
@@ -291,9 +305,11 @@ The JVM default time zone is forced to UTC in `JobtrackrBackendApplication.main`
 
 | Kind | Examples | What they prove |
 |---|---|---|
-| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `RefreshTokenServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest`, `RegisterRequestValidationTest` (the password policy) | The service logic, especially the move arithmetic, token rotation and expiry with a fixed `Clock`. Fast |
-| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `RefreshTokenCleanupIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
+| Unit (Mockito, no Spring, no database) | `ApplicationServiceTest`, `NoteServiceTest`, `AuthServiceTest`, `RefreshTokenServiceTest`, `UserServiceTest`, `StatsServiceTest`, `NotificationServiceTest`, `PasswordResetServiceTest`, `PasswordResetMailerTest` (with a mocked `JavaMailSender`), `RegisterRequestValidationTest` (the password policy) | The service logic, especially the move arithmetic, token rotation and expiry with a fixed `Clock`. Fast |
+| Integration (`@SpringBootTest`, real PostgreSQL) | `ApplicationApiIntegrationTest`, `AuthApiIntegrationTest`, `CorsIntegrationTest`, `NotificationApiIntegrationTest`, `PasswordResetApiIntegrationTest`, `ExpiredTokenCleanupIntegrationTest` | The real SQL, JSON shapes, status codes and the security filter chain |
 
-Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` and `NotificationApiIntegrationTest` replace `CurrentUserProvider` with a mock and skip the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters. No test calls an external service: there is no email, and scheduled jobs are switched off (`jobtrackr.scheduling.enabled=false` in `application-test.yml`); `RefreshTokenCleanupIntegrationTest` calls the job method directly.
+Integration tests are `@Transactional` and roll back, and each one creates its own throwaway user, so they never touch existing data. `ApplicationApiIntegrationTest` and `NotificationApiIntegrationTest` replace `CurrentUserProvider` with a mock and skip the security filters; `AuthApiIntegrationTest` uses real tokens through the real filters. No test calls an external service: `PasswordResetMailer` is mocked wherever an email could be sent, and scheduled jobs are switched off (`jobtrackr.scheduling.enabled=false` in `application-test.yml`); `ExpiredTokenCleanupIntegrationTest` calls the job method directly.
+
+The exception to "roll back": `PasswordResetApiIntegrationTest` is **not** `@Transactional`, because the reset email is sent only after commit, and a rolled-back test transaction never commits. It writes for real and deletes its own user in `@AfterEach` (the cascade removes its tokens), and waits for the asynchronous send with `verify(mailer, timeout(...))`.
 
 Every service method has a unit test. Keep it that way.

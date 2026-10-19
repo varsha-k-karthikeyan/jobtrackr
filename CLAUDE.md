@@ -20,7 +20,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 ## Stack
 
 - Backend: `jobtrackr-backend` — Spring Boot 4.1.x, Java 21, Maven (use the wrapper, `mvnw.cmd`)
-- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Lombok
+- Web MVC, Spring Data JPA (Hibernate), Bean Validation, Flyway, Spring Security with the OAuth2 resource server (JWT, HS256), Actuator, Mail (password-reset links, caught locally by Mailpit), Lombok
 - springdoc-openapi 3.x for Swagger UI (the 3.x line is the one for Boot 4; its version is pinned in `pom.xml`)
 - PostgreSQL 16 in Docker (`docker-compose.yml` at this root)
 - Tests: JUnit 5, Mockito, AssertJ, MockMvc
@@ -32,7 +32,7 @@ Commit messages are linted by commitlint through a husky `commit-msg` hook (`com
 Windows, PowerShell. Quote paths that contain spaces.
 
 ```powershell
-# 1. Database (from the monorepo root)
+# 1. Database and Mailpit (from the monorepo root). Mailpit's inbox: http://localhost:8025
 cd "E:\JobTrackr project"
 docker compose up -d
 
@@ -65,7 +65,7 @@ npm test           # unit tests (Vitest)
 - **Schema changes only through Flyway** migrations in `src/main/resources/db/migration`. `ddl-auto` stays `validate`. Never edit a migration that has been applied; add a new `V<n>__description.sql`.
 - **Test every service method** with a mocked unit test. Add an integration test when the behaviour depends on real SQL or the security filter chain.
 - **Meaningful names** for variables, parameters, query parameters and columns. No abbreviations such as `q` or `cb`; write `searchText`, `criteriaBuilder`.
-- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404. The only exception is a scheduled job's housekeeping query (`RefreshTokenRepository.deleteExpiredBefore`), never reachable from a controller.
+- **Every query filters by the current user.** Get the user id only from `CurrentUserProvider` (the JWT subject), never from a URL or request body. Another user's record must look like 404. The exceptions have no signed-in user by nature: the nightly cleanup job's housekeeping deletes, and the password-reset flow, which identifies the user by email address or hashed reset token.
 - **Comments explain why, not what**, and every class has a short comment stating its role. Schema documentation lives in `COMMENT ON` statements (see `V3__schema_comments.sql`).
 - Entities use Lombok `@Getter`/`@Setter` (not `@Data`), lazy `@ManyToOne`, and no `@OneToMany` collections.
 
@@ -98,10 +98,11 @@ npm test           # unit tests (Vitest)
 - The JVM runs in UTC (set in `main` and in the surefire config). Windows reports the zone as `Asia/Calcutta`, which the `postgres:16` image rejects on connect.
 - A locally installed PostgreSQL service on port 5432 hides the Docker container and causes "password authentication failed". Stop the Windows service before starting the container.
 - `spring.docker.compose.enabled` is `false`: Docker is started manually, the app never starts containers.
-- Scheduled jobs (`RefreshTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
+- Password-reset emails go to the Mailpit container (SMTP localhost:1025), which delivers nothing; read them at http://localhost:8025. If it is not running, the send fails with only a warning in the log (the request still answers 204). Tests mock `PasswordResetMailer` and never send.
+- Scheduled jobs (`ExpiredTokenCleanupJob`) run only when `jobtrackr.scheduling.enabled` is true (the default); `application-test.yml` sets it to false so nothing fires during tests.
 - Public demo account `demo@jobtrackr.dev` / `Demo@1234` (user id 1), created by V2 and given a real hash and sample data by `V4__demo_user_data.sql`. The password is published in the repo on purpose; the app is not hosted, so each local database has its own copy (reset with `docker compose down -v`). An integration test relies on it being able to log in.
 - CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, default `http://localhost:4200`). CORS is wired into the security chain (`http.cors(...)`), otherwise preflight requests get 401.
 
 ## Not built yet
 
-Deployment. Out of scope by decision: AI resume match (its tables were dropped in V8) and email (follow-up reminders are in-app only: the header bell, `notification` package; there is deliberately no SMTP).
+Deployment. Out of scope by decision: AI resume match (its tables were dropped in V8). Email is used only for password-reset links, sent to the local Mailpit container; follow-up reminders are in-app only (the header bell, `notification` package). Real email delivery would only need MAIL_* environment variables for a provider.

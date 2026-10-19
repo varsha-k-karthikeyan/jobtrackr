@@ -50,6 +50,19 @@ Read the **last** `Caused by:` in the stack trace; that is the real reason.
 
 `PUT /me/password` for the demo account: its password is published and shared, so it cannot be changed. Register your own account. (A missing or bad token is a 401, never a 403.)
 
+### Password-reset email does not arrive
+
+`POST /auth/forgot-password` always answers 204, so the answer tells you nothing; check in this order:
+
+| Check | Why |
+|---|---|
+| Open http://localhost:8025 | Locally every email goes to Mailpit, never to a real inbox |
+| `docker ps` lists `axllent/mailpit` | If Mailpit is down the send fails in the background: the log shows `Password-reset email for user N could not be sent: MailSendException` and the request still answers 204 |
+| The address is registered (lower case) and is not `demo@jobtrackr.dev` | Unknown addresses and the demo account silently get no email, on purpose |
+| A minute has passed since the last request | `resend-cooldown`: a second request within 1 minute sends nothing |
+
+A link that "doesn't work" was already used, is older than 30 minutes, or was replaced by a newer request (only the newest link works). Request a new one.
+
 ### 404 on a record you can see in the database
 
 The record belongs to a different user. Every lookup includes `user_id` (see ARCHITECTURE, section 5). Compare the token's subject with the row:
@@ -108,7 +121,7 @@ An exception with no handler. The stack trace is in the application log. Find th
 | A field is missing or null in the response | `ApplicationMapper`: was the field added to `toResponse`, `toEntity` and `applyUpdate`? |
 | A validation message is wrong | The annotations on the request record; then `GlobalExceptionHandler.handleMethodArgumentNotValid` |
 | The bell shows the wrong follow-ups or count | `NotificationService.getNotifications`; check `today` (decided in `notifications.zone`) and the rows from `findOpenFollowUps` |
-| Old refresh-token rows are not cleaned up | `RefreshTokenCleanupJob.deleteExpiredTokens`; the log prints `Refresh-token cleanup deleted N expired row(s)` each night. No line at all: `jobtrackr.scheduling.enabled` is false |
+| Old refresh-token or reset-link rows are not cleaned up | `ExpiredTokenCleanupJob.deleteExpiredTokens`; the log prints `Token cleanup deleted N expired refresh token(s) and M expired reset link(s)` each night. No line at all: `jobtrackr.scheduling.enabled` is false |
 
 ## 5. See what the app is doing
 

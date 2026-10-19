@@ -39,7 +39,7 @@ src/app/
 │   ├── state/                 ApplicationStore + pure board transforms (board-state.ts)
 │   └── testing/               builders shared by unit tests
 ├── features/                  one folder per page area, lazy-loaded by the router
-│   ├── auth/                  login (with "Try the demo") and register pages
+│   ├── auth/                  login (with "Try the demo"), register, forgot-password and reset-password pages
 │   ├── board/                 board page (CDK drag and drop) and the application card
 │   ├── list/                  server-side paginated table
 │   └── stats/                 stats strip shown above the board
@@ -90,6 +90,7 @@ Two tokens:
 - `core/interceptors/auth-interceptor.ts` adds the Bearer token to calls to our API only. On a 401 from a protected endpoint it refreshes once and retries the original request once with the new token. If the token was already replaced by another request meanwhile, it just retries. Only when the refresh fails does it clear the session, show one "session expired" message and go to `/login?returnUrl=...`.
 - `core/guards/auth-guards.ts`: `authGuard` protects `/board` and `/list`; `guestGuard` keeps signed-in users away from `/login` and `/register`. Both are async: with no valid access token (a reload after it expired) they first try to restore the session from the cookie.
 - `core/auth/token-storage.ts` also keeps a "session hint" flag, so a silent refresh is only attempted when a cookie probably exists (JavaScript cannot check the cookie itself). Logout clears it.
+- **Forgot password:** the login page links to `/forgot-password` (guest only), which calls `POST /auth/forgot-password` and always shows the same neutral "if an account exists..." message, as the backend never reveals whether an address is registered. In development it also links to the Mailpit inbox (`environment.mailInboxUrl`). The emailed link opens `/reset-password?token=...`, which has **no guard** (it must work in a browser that is still signed in), reads the token once and immediately removes it from the address bar with `replaceUrl`, so it is not kept in history. The token travels in the request body. On success the local session is cleared (the backend ended every session) and the page goes to `/login?reset=done`, which shows a confirmation. A used or expired link shows "Request a new link".
 - **Change password** (account menu, disabled for the demo account): `AuthService.changePassword` calls `PUT /me/password` with `withCredentials: true`, because the answer sets a new refresh cookie (the backend ended every session, this one included) and the browser only stores a cross-origin cookie from a credentialed request. The fresh access token replaces the stored one, so this tab stays signed in. A wrong current password comes back as a 400 field error and is shown under the field. The dialog is loaded on first use.
 - **Logout** calls `POST /auth/logout` (revokes the refresh token, deletes the cookie) and clears local state without waiting for the network.
 - **Tabs** stay in step through the `storage` event; if two tabs refresh at the same moment, the loser adopts the token the winner saved.
@@ -105,7 +106,7 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 
 ## Configuration
 
-`src/environments/environment.development.ts` (used by `ng serve`) and `environment.ts` (production build) hold `apiBaseUrl`. Everything in them ships to the browser, so no secrets.
+`src/environments/environment.development.ts` (used by `ng serve`) and `environment.ts` (production build) hold `apiBaseUrl` and `mailInboxUrl` (the local Mailpit inbox in development, `null` in production). Everything in them ships to the browser, so no secrets.
 
 ## Tests
 
@@ -118,6 +119,8 @@ The **access token stays in `localStorage`** so a reload does not need a refresh
 | `core/state/board-state.spec.ts` | Pure move/insert/remove maths, clamping, immutability |
 | `core/auth/auth-service.spec.ts` | Token persistence, restore and expiry on startup, one shared refresh, silent restore from the cookie, logout |
 | `core/interceptors/auth-interceptor.spec.ts` | Bearer only to our API, refresh + single retry on 401, one refresh for simultaneous 401s, no refresh loop, logout when the refresh fails |
+| `features/auth/reset-password-page/reset-password-page.spec.ts` | Token removed from the URL without a history entry, missing token, the exact request body, redirect with confirmation, used/expired link state |
+| `features/auth/forgot-password-page/forgot-password-page.spec.ts` | Email validation, the request body, the neutral confirmation |
 | `shared/components/change-password-dialog/change-password-dialog.spec.ts` | Required and match rules, the exact request (credentials included), token stored on success, server field error and the demo 403 |
 | `shared/components/application-dialog/application-dialog.spec.ts` | Form validation (required, cross-field salary, limits), edit prefill, the exact request body |
 

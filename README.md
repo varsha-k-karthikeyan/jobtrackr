@@ -33,7 +33,7 @@ This is a monorepo with the Spring Boot backend and the Angular frontend side by
 Windows PowerShell. Quote the path because it contains a space.
 
 ```powershell
-# 1. Start the database
+# 1. Start the database and Mailpit (the local mail catcher)
 cd "E:\JobTrackr project"
 docker compose up -d
 
@@ -57,7 +57,7 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 
 A real `JWT_SECRET` environment variable, if set, takes priority over the file; that is how a deployed server would provide it. Keep the value stable: changing it logs out everyone who holds a token.
 
-Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example) at the repository root. Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`, `SCHEDULING_ENABLED`, `REFRESH_TOKEN_CLEANUP_CRON`) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
+Every variable the backend reads is listed, with placeholders, in [`.env.example`](.env.example) at the repository root. Only `JWT_SECRET` is required; the others (`CORS_ALLOWED_ORIGINS`, `REFRESH_COOKIE_SECURE`, `NOTIFICATIONS_ZONE`, `SCHEDULING_ENABLED`, `TOKEN_CLEANUP_CRON`, `APP_URL`, `MAIL_FROM` and the `MAIL_*` server settings) have working defaults. Real values never go in that file: `.env` and `.env.properties` are git-ignored, `.env.example` is not.
 
 #### Environment variables in an IntelliJ run configuration (Windows)
 
@@ -75,6 +75,12 @@ Then open Swagger UI at http://localhost:8080/swagger-ui.html:
 1. Call `POST /api/v1/auth/register` (or `/login`) and copy `accessToken` from the response.
 2. Click **Authorize**, paste the token (without the word "Bearer").
 3. Every other endpoint now works.
+
+### Emails (forgot password)
+
+"Forgot password?" emails a reset link. Locally nothing is really delivered: the backend sends to **Mailpit**, a mail catcher started by `docker compose up -d`, and you read the email in its inbox at http://localhost:8025. No account is needed. The link works once and expires after 30 minutes.
+
+To deliver real email instead, point the `MAIL_*` variables in `.env.example` at a provider; no code changes.
 
 ### The app
 
@@ -114,6 +120,8 @@ Base path `/api/v1`. Everything except `/auth/**` needs `Authorization: Bearer <
 | `POST /auth/login` | Returns a 15-minute access token and sets the 14-day refresh-token cookie (httpOnly) |
 | `POST /auth/refresh` | No body: the browser sends the cookie. Rotates the refresh token and returns a new access token |
 | `POST /auth/logout` | Revokes the refresh token and deletes the cookie |
+| `POST /auth/forgot-password` | Emails a single-use, 30-minute reset link. Always 204, so it never reveals whether an address is registered |
+| `POST /auth/reset-password` | Sets a new password from the link's token and ends every session; 400 if the link is used, expired or unknown |
 | `GET /me` | The caller's profile |
 | `PUT /me/password` | Change the password (`currentPassword`, `newPassword`). Ends every session and returns a fresh one for this browser; 400 on a wrong current password, 403 for the demo account |
 | `GET /applications/board` | All cards grouped by status, ordered by position |
@@ -152,9 +160,9 @@ Then start the backend; Flyway rebuilds the database from the migrations.
 ## Status
 
 Built:
-- Backend: Kanban API (CRUD, move, notes), stats, follow-up notifications, validation and error handling, JWT authentication with nightly cleanup of expired sessions, CORS, a public demo account, tests.
-- Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, follow-up bell in the header, tests.
+- Backend: Kanban API (CRUD, move, notes), stats, follow-up notifications, validation and error handling, JWT authentication with nightly cleanup of expired sessions, password change and "forgot password" by email (caught locally by Mailpit), CORS, a public demo account, tests.
+- Frontend: login/register with "Try the demo", drag-and-drop board with optimistic updates, create/edit dialog with 409 handling, details drawer with notes, searchable server-side list with the state in the URL, stats strip, follow-up bell in the header, change-password dialog, forgot/reset password pages, tests.
 
 Sessions: a 15-minute access token plus a 14-day refresh token in an httpOnly cookie, rotated on every use, so you stay signed in while you keep using the app (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), section 8).
 
-Not built: deployment. Out of scope by decision: AI resume match, and email (follow-up reminders are in-app only, through the bell).
+Not built: deployment. Out of scope by decision: AI resume match. Email is used only for password-reset links and goes to the local Mailpit inbox; follow-up reminders are in-app only, through the bell.

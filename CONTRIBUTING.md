@@ -112,7 +112,7 @@ The short version; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the rea
 - Request and response bodies are Java records in the feature's `dto` package. Entities never appear in a controller signature.
 - Constructor injection only (`@RequiredArgsConstructor` with `final` fields). No field `@Autowired`.
 - The schema changes only through Flyway. `ddl-auto` stays `validate`.
-- Every query is scoped to the current user, whose id comes only from `CurrentUserProvider`. The only exception is a scheduled job's housekeeping query (the nightly refresh-token cleanup), which has no user and is never reachable from a controller.
+- Every query is scoped to the current user, whose id comes only from `CurrentUserProvider`. The exceptions have no signed-in user by nature: a scheduled job's housekeeping query (the nightly token cleanup) and the password-reset flow, which identifies the user by email address or hashed reset token.
 - Names are meaningful and unabbreviated: `searchText`, not `q`.
 - Every service method has a unit test.
 - Comments explain why, not what.

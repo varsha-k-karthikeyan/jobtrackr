@@ -6,15 +6,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 
 // Issues, rotates and revokes refresh tokens. Tokens are random and opaque (not JWTs): the database is the
 // source of truth, so a token can be revoked at any moment, which a self-contained JWT cannot offer.
@@ -35,9 +29,6 @@ public class RefreshTokenService {
      */
     static final Duration EXPIRED_TOKEN_RETENTION = Duration.ofDays(7);
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int TOKEN_BYTES = 32; // 256 bits
-
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
     private final Clock clock;
@@ -49,9 +40,7 @@ public class RefreshTokenService {
     /** Creates a token for the user and stores its hash. Returns the raw token, which is never stored. */
     @Transactional
     public String issue(User user) {
-        byte[] bytes = new byte[TOKEN_BYTES];
-        RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = OpaqueTokens.generate();
         Instant now = clock.instant();
         refreshTokenRepository.save(new RefreshToken(user, hash(token), now, now.plus(jwtProperties.refreshTokenTtl())));
         return token;
@@ -112,12 +101,7 @@ public class RefreshTokenService {
 
     /** Hex SHA-256. Deterministic (unlike BCrypt), so the row can be found by it. */
     static String hash(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("SHA-256 is required on every JVM", impossible);
-        }
+        return OpaqueTokens.hash(token);
     }
 
     private static BadCredentialsException invalid() {

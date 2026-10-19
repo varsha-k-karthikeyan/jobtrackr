@@ -35,6 +35,22 @@ spring:
     compose:
       enabled: false       # Docker is started manually with `docker compose up -d` from the monorepo root
 
+  # Outgoing mail (password-reset links). The defaults point at the local Mailpit container from
+  # docker-compose.yml, which keeps every email in its web inbox (http://localhost:8025) and delivers nothing.
+  # A real provider is configured purely through MAIL_* environment variables; credentials never go here.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
+      # Fail fast instead of tying up a thread if the mail server does not answer
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
 # In-app follow-up notifications (notification/NotificationProperties.java), validated at startup
 notifications:
   # "Today" for follow-up dates is decided in this zone, not in the JVM's UTC: a follow-up date is a
@@ -62,8 +78,18 @@ jobtrackr:
   # Background jobs (common/config/SchedulingConfig). Tests switch them off in application-test.yml.
   scheduling:
     enabled: ${SCHEDULING_ENABLED:true}
-  # Nightly delete of refresh-token rows that expired over 7 days ago (auth/RefreshTokenCleanupJob).
+  # Nightly delete of expired refresh-token and password-reset rows (auth/ExpiredTokenCleanupJob).
   # Spring cron: second minute hour day-of-month month day-of-week. Default: every day at 03:30, India time.
-  refresh-token-cleanup:
-    cron: ${REFRESH_TOKEN_CLEANUP_CRON:0 30 3 * * *}
+  token-cleanup:
+    cron: ${TOKEN_CLEANUP_CRON:0 30 3 * * *}
     zone: Asia/Kolkata
+  # "Forgot password" emails (auth/PasswordResetProperties.java), validated at startup
+  password-reset:
+    # Base URL of the frontend for the link in the email. Always from config, never from the request's
+    # Host header: a forged Host would otherwise make a genuine email point at an attacker's site.
+    app-url: ${APP_URL:http://localhost:4200}
+    from: ${MAIL_FROM:JobTrackr <no-reply@jobtrackr.local>}
+    # How long a reset link works. Short on purpose: the link is as good as the password until it is used.
+    token-ttl: 30m
+    # Minimum gap between two emails to the same account, so the endpoint cannot be used to flood an inbox
+    resend-cooldown: 1m

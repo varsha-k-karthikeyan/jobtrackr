@@ -1,8 +1,10 @@
 package com.jobtrackr.jobtrackrbackend.auth;
 
 import com.jobtrackr.jobtrackrbackend.auth.dto.AuthResponse;
+import com.jobtrackr.jobtrackrbackend.auth.dto.ForgotPasswordRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.LoginRequest;
 import com.jobtrackr.jobtrackrbackend.auth.dto.RegisterRequest;
+import com.jobtrackr.jobtrackrbackend.auth.dto.ResetPasswordRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 // The only endpoints reachable without a token (see SecurityConfig.PUBLIC_PATHS).
@@ -24,7 +27,24 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final RefreshTokenCookie refreshTokenCookie;
+
+    // Always 204, registered address or not, so the endpoint cannot be used to find out who has an account.
+    // The email (if any) is sent in the background after this returns.
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.email());
+    }
+
+    // 204 on success; the user then logs in with the new password (no session is started here).
+    // An invalid, used or expired link is a 400 with a message, deliberately not a 401.
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request);
+    }
 
     // Registering also logs the new user in: the response already contains an access token
     @PostMapping("/register")

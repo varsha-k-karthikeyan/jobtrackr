@@ -14,15 +14,15 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The real DELETE against PostgreSQL, called the way the nightly job calls it. The DELETE also sees other
+// The real DELETEs against PostgreSQL (refresh tokens and reset links), called the way the nightly job calls them. The DELETE also sees other
 // users' rows, so the assertions only look at this test's own user; the rollback undoes all of it.
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class RefreshTokenCleanupIntegrationTest {
+class ExpiredTokenCleanupIntegrationTest {
 
     @Autowired
-    private RefreshTokenCleanupJob cleanupJob;
+    private ExpiredTokenCleanupJob cleanupJob;
     @Autowired
     private JdbcTemplate jdbc;
 
@@ -41,6 +41,25 @@ class RefreshTokenCleanupIntegrationTest {
 
         assertThat(jdbc.queryForList("select token_hash from refresh_tokens where user_id = ? order by token_hash", String.class, userId))
                 .containsExactly("active", "expired-recently", "revoked-not-expired");
+    }
+
+    @Test
+    void deletesExpiredResetLinks_rightAway_butKeepsValidOnes() {
+        long userId = jdbc.queryForObject("insert into users (email, password_hash, full_name) values (?, 'x', 'Cleanup Test') returning id",
+                Long.class, "cleanup-" + UUID.randomUUID() + "@test.dev");
+        Instant now = Instant.now();
+        insertResetLink(userId, "expired-a-minute-ago", now.minus(Duration.ofMinutes(1)));
+        insertResetLink(userId, "still-valid", now.plus(Duration.ofMinutes(20)));
+
+        cleanupJob.deleteExpiredTokens();
+
+        assertThat(jdbc.queryForList("select token_hash from password_reset_tokens where user_id = ?", String.class, userId))
+                .containsExactly("still-valid");
+    }
+
+    private void insertResetLink(long userId, String label, Instant expiresAt) {
+        jdbc.update("insert into password_reset_tokens (user_id, token_hash, expires_at) values (?, ?, ?)",
+                userId, label, Timestamp.from(expiresAt));
     }
 
     // token_hash holds a readable label instead of a real hash: only expires_at matters to the cleanup

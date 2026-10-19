@@ -5,20 +5,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// Nightly housekeeping: without it, every login and every refresh adds a row to refresh_tokens forever.
-// Thin on purpose: the rule (what counts as deletable) lives in RefreshTokenService, where it is unit tested.
+// Nightly housekeeping: without it, every login and refresh, and every unused "forgot password" link, would
+// leave a row behind forever. Thin on purpose: what counts as deletable lives in RefreshTokenService and
+// PasswordResetService, where it is unit tested.
 // Runs only when scheduling is on (common/config/SchedulingConfig); tests switch it off.
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class RefreshTokenCleanupJob {
+public class ExpiredTokenCleanupJob {
 
     private final RefreshTokenService refreshTokenService;
+    private final PasswordResetService passwordResetService;
 
-    @Scheduled(cron = "${jobtrackr.refresh-token-cleanup.cron}", zone = "${jobtrackr.refresh-token-cleanup.zone}")
+    @Scheduled(cron = "${jobtrackr.token-cleanup.cron}", zone = "${jobtrackr.token-cleanup.zone}")
     public void deleteExpiredTokens() {
-        // Only a count is logged: no token hashes, no user ids
-        int deleted = refreshTokenService.deleteExpiredTokens();
-        log.info("Refresh-token cleanup deleted {} expired row(s)", deleted);
+        // Only counts are logged: no token hashes, no user ids
+        int refreshTokens = refreshTokenService.deleteExpiredTokens();
+        int resetLinks = passwordResetService.deleteExpiredTokens();
+        log.info("Token cleanup deleted {} expired refresh token(s) and {} expired reset link(s)", refreshTokens, resetLinks);
     }
 }

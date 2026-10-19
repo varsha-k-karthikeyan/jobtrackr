@@ -28,7 +28,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("delete from RefreshToken t where t.user.id = :userId")
     int deleteAllForUser(@Param("userId") Long userId);
 
-    // Housekeeping for RefreshTokenCleanupJob: one bulk DELETE, no entities loaded.
+    // Housekeeping for ExpiredTokenCleanupJob: one bulk DELETE, no entities loaded.
     // The deliberate exception to "every query is scoped to the current user": a scheduled job has no
     // logged-in user, and an expired row is useless to every user. Never called from a controller.
     @Modifying

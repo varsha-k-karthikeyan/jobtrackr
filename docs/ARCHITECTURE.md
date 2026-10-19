@@ -344,3 +344,27 @@ flowchart LR
 **Frontend image** (`jobtrackr-frontend/Dockerfile`): Node 24 builds, nginx serves. The production `apiBaseUrl` is `/api/v1` and nginx proxies `/api/` to `BACKEND_URL`, so the browser sees ONE origin: the `SameSite=Strict`, `Path=/api/v1/auth` refresh cookie is first-party and CORS never comes into play. Details in the frontend README.
 
 **Configuration:** every value comes from environment variables, which Compose also reads from a git-ignored root `.env` (see `.env.example`). `JWT_SECRET` has no default anywhere; Compose passes it as `${JWT_SECRET:-}` (empty) rather than `${JWT_SECRET:?}`, because Compose interpolates every service even when a profile is off, and `:?` would break plain `docker compose up -d`. The empty value then makes the backend refuse to start with a clear message.
+
+## 17. Deployment
+
+**Status: not deployed yet.** Everything below is prepared; choosing the hosts is the open step.
+
+What is ready:
+
+| Need | How it is met |
+|---|---|
+| A runnable backend | `jobtrackr-backend/Dockerfile` (JRE 21, non-root, about 300 MiB used under a 512 MB limit, starts in about 9 seconds) |
+| The platform's port | `server.port` reads `PORT` (default 8080) |
+| A health check for the platform | `GET /actuator/health`, public and detail-free; `/liveness` and `/readiness` as well |
+| Database settings without code changes | Spring Boot binds `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` to `spring.datasource.*` |
+| Secrets only from the environment | `JWT_SECRET` has no default; `.env.example` lists every variable with placeholders |
+| A static frontend | `ng build` output; production `apiBaseUrl` is the relative `/api/v1` |
+
+Constraints any hosting choice must respect:
+
+- **One origin for the browser.** The refresh cookie is `SameSite=Strict` with `Path=/api/v1/auth`. Whatever serves the frontend must forward `/api/*` to the backend (nginx in the image, or the host's rewrite rules); serving the API from a different site would need `SameSite=None; Secure`, an explicit CORS list and CSRF protection instead.
+- **HTTPS in production:** set `REFRESH_COOKIE_SECURE=true` so the cookie is only sent over HTTPS.
+- **A new, strong `JWT_SECRET`** generated for production, never the local one.
+- **Flyway needs a direct database connection.** Managed databases that put a pooler (PgBouncer in transaction mode) in front of PostgreSQL must give Flyway the direct, non-pooled URL; most require `sslmode=require` in the JDBC URL.
+- **Password-reset email needs a real SMTP provider** in production (`MAIL_*` variables). Without one, the request still answers 204 and the failure is only logged, so the feature should be configured or hidden before the URL is public.
+- **Demo data ages:** `V4__demo_user_data.sql` runs once, with dates relative to that day, so on a long-lived deployment the demo's follow-ups drift into the past.

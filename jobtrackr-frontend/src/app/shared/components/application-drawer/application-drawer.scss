@@ -1,30 +1,85 @@
+@use '@angular/material' as mat;
+
 :host {
   display: block;
   height: 100%;
 }
 
-.drawer-header {
-  background: var(--mat-sys-surface-container-low);
+// 52px white tile in the header, letters in the company's palette colour (same pick as the list and bell)
+.drawer-tile {
+  --tile-ink: var(--color-tile-indigo-ink);
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--color-band-line);
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  color: var(--tile-ink);
+  font-size: 16px;
+  font-weight: 800;
+
+  &[data-palette='pink'] { --tile-ink: var(--color-tile-pink-ink); }
+  &[data-palette='violet'] { --tile-ink: var(--color-tile-violet-ink); }
+  &[data-palette='green'] { --tile-ink: var(--color-tile-green-ink); }
+  &[data-palette='sky'] { --tile-ink: var(--color-tile-sky-ink); }
+  &[data-palette='amber'] { --tile-ink: var(--color-tile-amber-ink); }
 }
 
-.detail-grid {
+// Edit / delete / close: no border or fill, dark icons a little larger and heavier than default, a 44px
+// click area, and the band's border colour as the hover fill (instead of Material's translucent layer)
+.drawer-action {
+  @include mat.icon-button-overrides((
+    state-layer-size: 44px,
+    icon-size: 23px,
+    icon-color: var(--color-heading),
+    hover-state-layer-opacity: 0,
+  ));
+
+  mat-icon {
+    font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  }
+
+  &:hover {
+    background: var(--color-band-line);
+  }
+}
+
+// ---- Details table ----
+
+.detail-table {
+  overflow: hidden;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-card);
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+
+  & + & {
+    border-top: 1px solid var(--color-divider);
+  }
+
   dt {
-    color: var(--mat-sys-on-surface-variant);
+    padding: 0.6875rem 1rem;
+    background: var(--color-surface-subtle);
+    color: var(--color-label);
+    font-weight: 600;
   }
 
   dd {
+    min-width: 0;
     margin: 0;
+    padding: 0.6875rem 1rem;
+    color: var(--color-body);
   }
 }
 
-.follow-up-overdue {
-  color: var(--mat-sys-error);
-  font-weight: 600;
-}
-
-.follow-up-today {
-  color: var(--mat-sys-tertiary);
-  font-weight: 600;
+.not-set {
+  color: var(--color-muted);
 }
 
 .inline-icon {
@@ -34,39 +89,83 @@
   vertical-align: middle;
 }
 
+// ---- Sections ----
+
 .section-title {
-  margin: 1.5rem 0 0.5rem;
-  font: var(--mat-sys-title-small);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0.75rem;
+  color: var(--color-heading);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.count-pill {
+  min-width: 1.375rem;
+  padding: 0 0.4375rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-segment);
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .jd-text {
   max-height: 14rem;
   overflow-y: auto;
-  padding: 0.75rem;
-  border-radius: var(--mat-sys-corner-small);
-  background: var(--mat-sys-surface-container);
-  font: var(--mat-sys-body-small);
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+  color: var(--color-secondary);
+  font-size: 13px;
   white-space: pre-line;
 }
 
-// Vertical line with a dot per note
-.timeline-item {
-  position: relative;
-  padding: 0 0 1rem 1.25rem;
-  border-left: 2px solid var(--mat-sys-outline-variant);
+// Keyboard keys in "Ctrl + Enter to add"
+kbd {
+  display: inline-block;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid var(--color-button-line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
 
-  &::before {
-    content: '';
-    position: absolute;
-    left: -6px;
-    top: 0.2rem;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--mat-sys-primary);
-  }
+// ---- Notes ----
 
-  &:last-child {
-    border-left-color: transparent;
+.notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--color-button-line);
+  border-radius: var(--radius-field);
+  font-size: 14px;
+  text-align: center;
+
+  mat-icon {
+    color: var(--color-muted);
   }
+}
+
+.note-card {
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-job-card);
+}
+
+.note-delete {
+  @include mat.icon-button-overrides((
+    icon-color: var(--color-muted),
+  ));
 }

@@ -1,33 +1,35 @@
 <div class="flex h-full flex-col">
-  <!-- Header: title, actions, close -->
-  <div class="drawer-header flex items-start gap-2 px-5 pb-3 pt-4">
-    <div class="min-w-0 flex-1">
-      @if (detail(); as current) {
-        <h2 class="m-0 truncate text-xl font-semibold" [title]="current.application.company">{{ current.application.company }}</h2>
-        <p class="m-0 mt-0.5 text-sm opacity-80">{{ current.application.role }}</p>
-      } @else {
-        <h2 class="m-0 text-xl font-semibold">Application</h2>
-      }
-    </div>
-    @if (detail()) {
-      <button mat-icon-button type="button" (click)="edit()" aria-label="Edit application">
+  <!-- Header band: company tile, company and role, then edit / delete / close -->
+  <div class="flex items-center gap-3.5 border-b border-band-line bg-band py-5 pl-6 pr-4">
+    @if (detail(); as current) {
+      <span class="drawer-tile" [attr.data-palette]="tilePalette(current.application.company)" aria-hidden="true">
+        {{ tileInitials(current.application.company) }}
+      </span>
+      <div class="min-w-0 flex-1">
+        <h2 class="m-0 truncate text-[26px] leading-tight font-extrabold tracking-tight text-heading" [title]="current.application.company">
+          {{ current.application.company }}
+        </h2>
+        <p class="m-0 mt-0.5 truncate text-base text-subtitle">{{ current.application.role }}</p>
+      </div>
+      <button mat-icon-button type="button" class="drawer-action" (click)="edit()" aria-label="Edit application">
         <mat-icon>edit</mat-icon>
       </button>
-      <button mat-icon-button type="button" (click)="delete()" aria-label="Delete application">
+      <!-- Not red on purpose: deleting asks for confirmation first -->
+      <button mat-icon-button type="button" class="drawer-action" (click)="delete()" aria-label="Delete application">
         <mat-icon>delete</mat-icon>
       </button>
+    } @else {
+      <h2 class="m-0 min-w-0 flex-1 text-[26px] font-extrabold text-heading">Application</h2>
     }
-    <button mat-icon-button type="button" (click)="close()" aria-label="Close details">
+    <button mat-icon-button type="button" class="drawer-action" (click)="close()" aria-label="Close details">
       <mat-icon>close</mat-icon>
     </button>
   </div>
   @if (loading()) {
     <mat-progress-bar mode="indeterminate" aria-label="Loading details" />
-  } @else {
-    <mat-divider />
   }
 
-  <div class="flex-1 overflow-y-auto px-5 py-4">
+  <div class="flex-1 overflow-y-auto px-6 py-5">
     @if (loadError(); as message) {
       <div class="app-error-banner flex flex-wrap items-center justify-between gap-3" role="alert">
         <span>{{ message }}</span>
@@ -36,47 +38,72 @@
     } @else if (detail(); as current) {
       @let card = current.application;
 
-      <dl class="detail-grid m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt>Status</dt>
-        <dd><span class="status-badge" [attr.data-status]="card.status">{{ statusLabels[card.status] }}</span></dd>
-
-        <dt>Location</dt>
-        <dd>{{ card.location ?? '—' }}</dd>
-
-        <dt>Salary</dt>
-        <dd>{{ salary() ?? '—' }}</dd>
-
-        <dt>Source</dt>
-        <dd>{{ card.source ?? '—' }}</dd>
-
-        <dt>Applied on</dt>
-        <dd>{{ card.appliedOn ? (card.appliedOn | date: 'd MMM y') : '—' }}</dd>
-
-        <dt>Follow up</dt>
-        <dd [class.follow-up-overdue]="followUp() === 'overdue'" [class.follow-up-today]="followUp() === 'today'">
-          @if (card.followUpOn) {
-            {{ card.followUpOn | date: 'd MMM y' }}
-            @if (followUp() === 'overdue') { (overdue) } @else if (followUp() === 'today') { (today) }
-          } @else {
-            —
-          }
-        </dd>
-
-        <dt>Interview</dt>
-        <dd>{{ card.interviewAt ? (card.interviewAt | date: 'd MMM y, h:mm a') : '—' }}</dd>
-
-        <dt>Job link</dt>
-        <dd class="min-w-0">
-          @if (card.jdUrl) {
-            <a class="app-link break-all" [href]="card.jdUrl" target="_blank" rel="noopener noreferrer">
-              {{ card.jdUrl }}
-              <mat-icon class="inline-icon" aria-hidden="true">open_in_new</mat-icon>
-              <span class="sr-only">(opens in a new tab)</span>
-            </a>
-          } @else {
-            —
-          }
-        </dd>
+      <!-- Label column on a subtle surface, values on white, a divider between rows -->
+      <dl class="detail-table m-0 text-sm">
+        <div class="detail-row">
+          <dt>Status</dt>
+          <dd><span class="status-badge" [attr.data-status]="card.status">{{ statusLabels[card.status] }}</span></dd>
+        </div>
+        <div class="detail-row">
+          <dt>Location</dt>
+          <dd>
+            @if (card.location) { {{ card.location }} } @else { <span class="not-set">Not set</span> }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Salary</dt>
+          <dd>
+            @if (salary(); as salaryText) { {{ salaryText }} } @else { <span class="not-set">Not set</span> }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Source</dt>
+          <dd>
+            @if (card.source) { {{ card.source }} } @else { <span class="not-set">Not set</span> }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Applied on</dt>
+          <dd>
+            @if (card.appliedOn) { {{ card.appliedOn | date: 'd MMM y' }} } @else { <span class="not-set">Not set</span> }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Follow up</dt>
+          <dd class="flex flex-wrap items-center gap-2">
+            @if (card.followUpOn) {
+              {{ card.followUpOn | date: 'd MMM y' }}
+              <!-- Overdue / today in words as well as colour -->
+              @if (followUp() === 'overdue') {
+                <span class="pill pill-overdue">Overdue</span>
+              } @else if (followUp() === 'today') {
+                <span class="pill pill-due">Today</span>
+              }
+            } @else {
+              <span class="not-set">Not set</span>
+            }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Interview</dt>
+          <dd>
+            @if (card.interviewAt) { {{ card.interviewAt | date: 'd MMM y, h:mm a' }} } @else { <span class="not-set">Not set</span> }
+          </dd>
+        </div>
+        <div class="detail-row">
+          <dt>Job link</dt>
+          <dd class="min-w-0">
+            @if (card.jdUrl) {
+              <a class="app-link break-all" [href]="card.jdUrl" target="_blank" rel="noopener noreferrer">
+                {{ card.jdUrl }}
+                <mat-icon class="inline-icon" aria-hidden="true">open_in_new</mat-icon>
+                <span class="sr-only">(opens in a new tab)</span>
+              </a>
+            } @else {
+              <span class="not-set">Not set</span>
+            }
+          </dd>
+        </div>
       </dl>
 
       @if (card.jdText) {
@@ -84,7 +111,10 @@
         <div class="jd-text">{{ card.jdText }}</div>
       }
 
-      <h3 class="section-title">Notes</h3>
+      <h3 class="section-title">
+        Notes
+        <span class="count-pill" [attr.aria-label]="current.notes.length + ' notes'">{{ current.notes.length }}</span>
+      </h3>
       <!-- Not a <form>: with a lone [formControl] there is no NgForm/FormGroupDirective to intercept
            submit, so a submit button would trigger a native submission and reload the page. -->
       <div class="flex flex-col gap-2">
@@ -93,48 +123,57 @@
           <textarea
             matInput
             [formControl]="noteControl"
-            rows="2"
+            rows="3"
             placeholder="e.g. Recruiter call scheduled"
+            aria-describedby="note-shortcut"
             (keydown.control.enter)="addNote()"
           ></textarea>
-          <mat-hint>Ctrl + Enter to add</mat-hint>
           @if (noteControl.hasError('required') && noteControl.touched) {
             <mat-error>Write something first</mat-error>
           }
         </mat-form-field>
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span id="note-shortcut" class="text-xs text-muted"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to add</span>
           <button mat-flat-button type="button" (click)="addNote()" [disabled]="savingNote()">
-            <mat-icon>add_comment</mat-icon>
+            <mat-icon>add</mat-icon>
             Add note
           </button>
         </div>
       </div>
 
       @if (current.notes.length === 0) {
-        <p class="m-0 mt-3 text-sm opacity-70">No notes yet.</p>
+        <!-- Same dashed style as an empty board column -->
+        <div class="notes-empty mt-4">
+          <mat-icon aria-hidden="true">description</mat-icon>
+          <span class="font-semibold text-secondary">No notes yet</span>
+          <span class="text-xs text-muted">Interview questions, recruiter names, anything worth remembering</span>
+        </div>
       } @else {
-        <ol class="timeline mt-3 list-none p-0" aria-label="Notes, newest first">
+        <ol class="mt-4 flex list-none flex-col gap-3 p-0" aria-label="Notes, newest first">
           @for (note of current.notes; track note.id) {
-            <li class="timeline-item">
+            <li class="note-card">
               <div class="flex items-start gap-2">
                 <div class="min-w-0 flex-1">
-                  <time class="block text-xs opacity-70" [attr.datetime]="note.createdAt">
+                  <time class="block text-xs font-semibold text-muted" [attr.datetime]="note.createdAt">
                     {{ note.createdAt | date: 'd MMM y, h:mm a' }}
                   </time>
-                  <p class="m-0 mt-0.5 whitespace-pre-line break-words text-sm">{{ note.body }}</p>
+                  <p class="m-0 mt-1 whitespace-pre-line break-words text-sm text-body">{{ note.body }}</p>
                 </div>
-                <button mat-icon-button type="button" class="-mr-2 -mt-2" (click)="deleteNote(note.id)" aria-label="Delete note">
-                  <mat-icon>delete_outline</mat-icon>
+                <button mat-icon-button type="button" class="note-delete -mr-2 -mt-2" (click)="deleteNote(note.id)" aria-label="Delete note">
+                  <mat-icon>delete</mat-icon>
                 </button>
               </div>
             </li>
           }
         </ol>
       }
-
-      <p class="m-0 mt-6 text-xs opacity-60">
-        Created {{ card.createdAt | date: 'd MMM y, h:mm a' }} · Updated {{ card.updatedAt | date: 'd MMM y, h:mm a' }}
-      </p>
     }
   </div>
+
+  <!-- Footer pinned to the bottom -->
+  @if (detail(); as current) {
+    <div class="border-t border-divider bg-surface-subtle px-6 py-3 text-xs text-muted">
+      Created {{ current.application.createdAt | date: 'd MMM y, h:mm a' }} · Updated {{ current.application.updatedAt | date: 'd MMM y, h:mm a' }}
+    </div>
+  }
 </div>

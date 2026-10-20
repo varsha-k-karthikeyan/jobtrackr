@@ -3,7 +3,6 @@ import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -11,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { problemMessage } from '../../../core/api/problem-message';
 import { APPLICATION_STATUS_LABELS } from '../../../core/models/application.model';
 import { ApplicationStore } from '../../../core/state/application-store';
+import { companyInitials, companyTilePalette } from '../../utils/company-tile';
 import { followUpState } from '../../utils/dates';
 import { formatSalary } from '../../utils/format';
 import { ApplicationDialogs } from '../application-dialogs';
@@ -28,7 +28,8 @@ export function openApplicationDrawer(
     data: { applicationId },
     position: { top: '0', right: '0' },
     height: '100dvh',
-    width: 'min(32rem, 100vw)',
+    // 640px on desktop, the full width on phones
+    width: 'min(40rem, 100vw)',
     maxWidth: '100vw',
     maxHeight: '100dvh',
     panelClass: 'app-drawer-panel',
@@ -45,7 +46,6 @@ export function openApplicationDrawer(
     ReactiveFormsModule,
     MatButtonModule,
     MatDialogModule,
-    MatDividerModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -61,6 +61,8 @@ export class ApplicationDrawer implements OnInit, OnDestroy {
   private readonly data = inject<ApplicationDrawerData>(MAT_DIALOG_DATA);
 
   protected readonly statusLabels = APPLICATION_STATUS_LABELS;
+  protected readonly tileInitials = companyInitials;
+  protected readonly tilePalette = companyTilePalette;
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly savingNote = signal(false);

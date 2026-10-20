@@ -171,6 +171,13 @@ body {
   box-shadow: 0 0 0 2px var(--color-surface);
 }
 
+// Account menu panel: 360px (Material's menu caps panels at 280px). The panel element is created by MatMenu,
+// outside the shell template, so its size is set here, scoped by the menu's class.
+.account-menu.mat-mdc-menu-panel {
+  width: 360px;
+  max-width: calc(100vw - 2rem);
+}
+
 // List page paginator (elements inside Material's paginator template, so styled globally, scoped by class).
 // Previous/next get a 1px outline; the built-in range text is blank (MatPaginatorIntl) because the list
 // shows its own "Showing a–b of n" on the left, so the empty element must not take up space.

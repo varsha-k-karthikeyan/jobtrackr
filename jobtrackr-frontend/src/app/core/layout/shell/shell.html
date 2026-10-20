@@ -138,35 +138,63 @@
       <span class="hidden max-w-40 truncate text-sm font-semibold text-body sm:inline" aria-hidden="true">{{ displayName() }}</span>
       <mat-icon class="account-chevron text-muted" aria-hidden="true">expand_more</mat-icon>
     </button>
-    <mat-menu #userMenu="matMenu" xPosition="before">
+    <!-- 360px panel (width in styles.scss: Material creates the panel outside this template) -->
+    <mat-menu #userMenu="matMenu" xPosition="before" class="account-menu">
       @if (user(); as signedIn) {
-        <div class="px-4 py-2">
-          <div class="text-sm font-semibold">{{ signedIn.fullName ?? 'Signed in as' }}</div>
-          <div class="text-xs opacity-70">{{ signedIn.email }}</div>
+        <!-- Who is signed in. Not an item: clicking it does not close the menu -->
+        <div class="account-head -mt-2 mb-2 flex items-center gap-3 bg-band px-5 py-4" (click)="$event.stopPropagation()">
+          <span class="flex size-12 flex-none items-center justify-center rounded-pill bg-accent text-base font-bold text-on-accent" aria-hidden="true">
+            {{ initials() }}
+          </span>
+          <span class="flex min-w-0 flex-col">
+            <span class="text-xs text-muted">Signed in as</span>
+            <span class="truncate text-base font-extrabold text-heading">{{ displayName() }}</span>
+            <span class="truncate text-[13px] text-secondary" [title]="signedIn.email">{{ signedIn.email }}</span>
+          </span>
         </div>
-        <mat-divider />
-      }
-      <!-- One switch for all reminder emails. The demo account never gets email, so it cannot switch them on. -->
-      @if (user(); as signedIn) {
+
+        <!-- One switch for all reminder emails. The whole item is the checkbox; the switch is only its picture.
+             The demo account never gets email, so it cannot switch them on. -->
         <button
           mat-menu-item
+          class="account-item"
           role="menuitemcheckbox"
           [attr.aria-checked]="signedIn.emailRemindersEnabled"
           (click)="toggleEmailReminders()"
           [disabled]="isDemoAccount()"
         >
-          <mat-icon>{{ signedIn.emailRemindersEnabled && !isDemoAccount() ? 'mark_email_read' : 'unsubscribe' }}</mat-icon>
-          <span>{{ isDemoAccount() ? 'Reminder emails (not for the demo)' : signedIn.emailRemindersEnabled ? 'Reminder emails: On' : 'Reminder emails: Off' }}</span>
+          <span class="account-item-row">
+            <span class="item-tile item-tile-accent" aria-hidden="true"><mat-icon>mail</mat-icon></span>
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="text-sm font-semibold text-body">Reminder emails</span>
+              <span class="text-xs text-muted">{{ isDemoAccount() ? 'Not available for the demo account' : 'Daily digest and interview alerts' }}</span>
+            </span>
+            <span class="switch" [class.is-on]="signedIn.emailRemindersEnabled && !isDemoAccount()" aria-hidden="true">
+              <span class="switch-knob"></span>
+            </span>
+            <span class="sr-only">{{ signedIn.emailRemindersEnabled ? 'On' : 'Off' }}</span>
+          </span>
         </button>
       }
       <!-- The demo account is shared, so its password is fixed (the backend refuses with 403 as well) -->
-      <button mat-menu-item (click)="changePassword()" [disabled]="isDemoAccount()">
-        <mat-icon>lock_reset</mat-icon>
-        <span>{{ isDemoAccount() ? 'Change password (not for the demo)' : 'Change password' }}</span>
+      <button mat-menu-item class="account-item" (click)="changePassword()" [disabled]="isDemoAccount()">
+        <span class="account-item-row">
+          <span class="item-tile" aria-hidden="true"><mat-icon>lock</mat-icon></span>
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="text-sm font-semibold text-body">Change password</span>
+            @if (isDemoAccount()) {
+              <span class="text-xs text-muted">Not available for the demo account</span>
+            }
+          </span>
+          <mat-icon class="item-chevron" aria-hidden="true">chevron_right</mat-icon>
+        </span>
       </button>
-      <button mat-menu-item (click)="logout()">
-        <mat-icon>logout</mat-icon>
-        <span>Log out</span>
+      <mat-divider class="account-divider" />
+      <button mat-menu-item class="account-item account-item-danger" (click)="logout()">
+        <span class="account-item-row">
+          <span class="item-tile item-tile-danger" aria-hidden="true"><mat-icon>logout</mat-icon></span>
+          <span class="text-sm font-bold">Log out</span>
+        </span>
       </button>
     </mat-menu>
     </div>

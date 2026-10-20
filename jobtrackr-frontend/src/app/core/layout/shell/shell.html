@@ -34,6 +34,7 @@
     <!-- Interviews and follow-ups. Opening the menu refreshes the lists (the date may have rolled over). -->
     <button
       mat-icon-button
+      #bellTrigger="matMenuTrigger"
       class="header-bell"
       [class.is-open]="bellOpen()"
       [matMenuTriggerFor]="notificationMenu"
@@ -172,7 +173,8 @@
   </div>
 </header>
 
-<!-- Same width and side padding as the header, so page content lines up under the logo -->
-<main class="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-8 sm:py-6">
+<!-- No padding here: pages can run a full-width band, then center their content at the header's width
+     (1440px, 32px sides) so it lines up under the logo -->
+<main class="w-full">
   <router-outlet />
 </main>

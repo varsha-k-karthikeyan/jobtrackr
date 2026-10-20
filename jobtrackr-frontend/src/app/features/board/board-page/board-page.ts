@@ -1,6 +1,6 @@
 import { CdkDrag, CdkDragDrop, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { CdkScrollable } from '@angular/cdk/scrolling';
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,9 +11,13 @@ import {
   APPLICATION_STATUSES,
   ApplicationStatus,
 } from '../../../core/models/application.model';
+import { AuthService } from '../../../core/auth/auth-service';
+import { HeaderMenus } from '../../../core/layout/header-menus';
+import { NotificationStore } from '../../../core/notifications/notification-store';
 import { ApplicationStore } from '../../../core/state/application-store';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
 import { ApplicationDialogs } from '../../../shared/components/application-dialogs';
+import { firstName, timeOfDayGreeting } from '../../../shared/utils/person';
 import { StatsStrip } from '../../stats/stats-strip/stats-strip';
 import { ApplicationCard } from '../application-card/application-card';
 
@@ -41,6 +45,24 @@ export class BoardPage implements OnInit {
 
   protected readonly statuses = APPLICATION_STATUSES;
   protected readonly labels = APPLICATION_STATUS_LABELS;
+  protected readonly emptyText: Record<ApplicationStatus, string> = {
+    APPLIED: 'No applications yet',
+    INTERVIEW: 'No interviews yet',
+    OFFER: 'No offers yet',
+    REJECTED: 'Nothing here',
+  };
+
+  // Welcome band. The greeting is picked once, when the page opens, from the browser's local time.
+  private readonly auth = inject(AuthService);
+  private readonly headerMenus = inject(HeaderMenus);
+  protected readonly greeting = timeOfDayGreeting();
+  protected readonly firstName = computed(() => {
+    const user = this.auth.user();
+    return user ? firstName(user.fullName, user.email) : 'there';
+  });
+  /** Due today plus overdue: the bell's own list, so the pill and the bell always agree. */
+  private readonly notifications = inject(NotificationStore);
+  protected readonly followUpsDue = computed(() => this.notifications.due().length);
   /** Three grey placeholder cards per column while the first load runs. */
   protected readonly skeletonCards = [1, 2, 3];
   /** Touch: hold briefly before a drag starts, so a normal swipe still scrolls the board sideways. */
@@ -56,6 +78,10 @@ export class BoardPage implements OnInit {
 
   protected retry(): void {
     void this.store.loadBoard();
+  }
+
+  protected openFollowUps(): void {
+    this.headerMenus.openBell();
   }
 
   protected addApplication(status: ApplicationStatus = 'APPLIED'): void {

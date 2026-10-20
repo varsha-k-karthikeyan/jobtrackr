@@ -1,41 +1,69 @@
-@use '@angular/material' as mat;
-
 :host {
   display: block;
 }
 
+// A plain element (not mat-card), so the design's radius and shadow come straight from the tokens
 .application-card {
+  padding: 0.875rem 1rem 0.75rem;
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-job-card);
   cursor: grab;
 
-  // Visible keyboard focus in the theme colour (the card is focusable and opens on Enter)
+  // Visible keyboard focus (the card is focusable and opens on Enter)
   &:focus-visible {
-    outline: 2px solid var(--mat-sys-primary);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }
 
 .meta-icon {
-  width: 14px;
-  height: 14px;
-  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
 }
 
-// Follow-up chip colours through Material's own override API (not CSS that fights its internals).
-// Overdue uses the theme's error colours, today the tertiary colours; upcoming keeps the default look.
-.follow-up-overdue {
-  @include mat.chips-overrides((
-    elevated-container-color: var(--mat-sys-error-container),
-    outline-color: var(--mat-sys-error),
-    label-text-color: var(--mat-sys-on-error-container),
-    with-icon-icon-color: var(--mat-sys-on-error-container),
-  ));
+// Date pills. Colours from the pill tokens; the text always says what the colour means.
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
+  }
 }
 
-.follow-up-today {
-  @include mat.chips-overrides((
-    elevated-container-color: var(--mat-sys-tertiary-container),
-    outline-color: var(--mat-sys-tertiary),
-    label-text-color: var(--mat-sys-on-tertiary-container),
-    with-icon-icon-color: var(--mat-sys-on-tertiary-container),
-  ));
+.pill-overdue {
+  background: var(--color-overdue-soft);
+  color: var(--color-overdue-ink);
+}
+
+.pill-due {
+  background: var(--color-due-soft);
+  color: var(--color-due-ink);
+}
+
+.pill-today-interview {
+  background: var(--color-today-interview-soft);
+  color: var(--color-today-interview-ink);
+}
+
+.pill-tomorrow {
+  background: var(--color-tomorrow-soft);
+  color: var(--color-tomorrow-ink);
+}
+
+// A follow-up that is not due yet: quiet, outlined
+.pill-upcoming {
+  background: var(--color-surface-subtle);
+  color: var(--color-secondary);
+  box-shadow: inset 0 0 0 1px var(--color-line);
 }

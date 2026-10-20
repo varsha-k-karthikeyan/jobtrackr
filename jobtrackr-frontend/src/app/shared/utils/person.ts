@@ -17,3 +17,12 @@ export function personInitials(fullName: string | null, email: string): string {
     words.length >= 2 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? email.split('@')[0]).slice(0, 2);
   return letters.toUpperCase();
 }
+
+/** "Good morning" until noon, "Good afternoon" until 5 PM, then "Good evening" (the browser's local time). */
+export function timeOfDayGreeting(now: Date = new Date()): string {
+  const hour = now.getHours();
+  if (hour < 12) {
+    return 'Good morning';
+  }
+  return hour < 17 ? 'Good afternoon' : 'Good evening';
+}

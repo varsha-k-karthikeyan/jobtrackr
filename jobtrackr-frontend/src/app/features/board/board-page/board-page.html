@@ -1,21 +1,37 @@
-<section class="flex flex-col gap-4">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex items-baseline gap-3">
-      <h1 class="m-0 text-2xl font-semibold">Board</h1>
-      @if (store.loaded()) {
-        <span class="text-sm opacity-70">{{ store.total() }} {{ store.total() === 1 ? 'application' : 'applications' }}</span>
-      }
+<!-- Welcome band: full width, content centred at the header's width -->
+<section class="border-b border-band-line bg-band" aria-labelledby="board-greeting">
+  <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-7 sm:px-8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="flex min-w-0 flex-col gap-2">
+        <h1 id="board-greeting" class="m-0 text-[30px] leading-tight font-extrabold tracking-tight text-heading">
+          {{ greeting }}, {{ firstName() }}
+        </h1>
+        @if (store.loaded()) {
+          <div class="flex flex-wrap items-center gap-2 text-[15px] text-secondary">
+            <span>You are tracking {{ store.total() }} {{ store.total() === 1 ? 'application' : 'applications' }}.</span>
+            @if (followUpsDue() > 0) {
+              <!-- Opens the bell menu, where the due follow-ups are listed and can be dismissed -->
+              <button type="button" class="due-pill" (click)="openFollowUps()">
+                <mat-icon aria-hidden="true">notifications</mat-icon>
+                {{ followUpsDue() }} {{ followUpsDue() === 1 ? 'follow-up' : 'follow-ups' }} due
+              </button>
+            }
+          </div>
+        }
+      </div>
+      <button mat-flat-button type="button" (click)="addApplication()">
+        <mat-icon>add</mat-icon>
+        Add application
+      </button>
     </div>
-    <button mat-flat-button type="button" (click)="addApplication()">
-      <mat-icon>add</mat-icon>
-      Add application
-    </button>
+
+    @if (store.loaded()) {
+      <app-stats-strip />
+    }
   </div>
+</section>
 
-  @if (store.loaded()) {
-    <app-stats-strip />
-  }
-
+<section class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-6 sm:px-8" aria-label="Board">
   @if (store.error(); as message) {
     <!-- Load failed: keep any board already on screen, offer a retry -->
     <div class="app-error-banner flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -31,11 +47,15 @@
     <!-- First load: skeleton columns in the same layout as the real board -->
     <div class="board-columns" aria-busy="true" aria-label="Loading board">
       @for (status of statuses; track status) {
-        <div class="board-column">
-          <div class="mb-3 h-4 w-24 animate-pulse rounded skeleton-block"></div>
-          @for (placeholder of skeletonCards; track placeholder) {
-            <div class="mb-3 h-24 animate-pulse rounded-xl skeleton-block"></div>
-          }
+        <div class="board-column" [attr.data-status]="status">
+          <div class="column-header">
+            <div class="h-4 w-24 animate-pulse rounded skeleton-block"></div>
+          </div>
+          <div class="card-list">
+            @for (placeholder of skeletonCards; track placeholder) {
+              <div class="h-28 animate-pulse rounded-field skeleton-block"></div>
+            }
+          </div>
         </div>
       }
     </div>
@@ -43,25 +63,24 @@
     <!-- cdkScrollable: lets a drag auto-scroll this sideways-scrolling container on small screens -->
     <div class="board-columns" cdkDropListGroup cdkScrollable>
       @for (status of statuses; track status) {
-        <div class="board-column">
-          <div class="mb-3 flex items-center justify-between gap-2 px-1">
-            <h2 class="m-0 text-sm font-semibold uppercase tracking-wide">{{ labels[status] }}</h2>
-            <div class="flex items-center gap-1">
-              <span class="count-badge" [attr.aria-label]="store.counts()[status] + ' applications'">
-                {{ store.counts()[status] }}
-              </span>
-              <button
-                mat-icon-button
-                type="button"
-                class="column-add-button"
-                (click)="addApplication(status)"
-                [attr.aria-label]="'Add application to ' + labels[status]"
-              >
-                <mat-icon>add</mat-icon>
-              </button>
-            </div>
+        <div class="board-column" [attr.data-status]="status">
+          <div class="column-header">
+            <h2 class="m-0 text-[15px] font-extrabold text-heading">{{ labels[status] }}</h2>
+            <span class="count-pill" [attr.aria-label]="store.counts()[status] + ' applications'">
+              {{ store.counts()[status] }}
+            </span>
+            <button
+              mat-icon-button
+              type="button"
+              class="column-add-button ml-auto"
+              (click)="addApplication(status)"
+              [attr.aria-label]="'Add application to ' + labels[status]"
+            >
+              <mat-icon>add</mat-icon>
+            </button>
           </div>
 
+          <!-- The drop list fills the rest of the column, so a card can be dropped anywhere below the header -->
           <div
             class="card-list"
             cdkDropList
@@ -82,8 +101,8 @@
               />
             } @empty {
               <div class="empty-column">
-                <mat-icon aria-hidden="true">inbox</mat-icon>
-                <span>Drop applications here</span>
+                <span class="font-semibold text-secondary">{{ emptyText[status] }}</span>
+                <span class="text-xs text-muted">Drag a card here</span>
               </div>
             }
           </div>

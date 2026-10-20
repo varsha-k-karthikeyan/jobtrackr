@@ -43,7 +43,7 @@ src/app/
 │   ├── auth/                  login (with "Try the demo"), register, forgot-password and reset-password pages
 │   ├── board/                 board page (CDK drag and drop) and the application card
 │   ├── list/                  server-side paginated table
-│   └── stats/                 stats strip shown above the board
+│   └── stats/                 stats strip shown in the board's welcome band
 └── shared/                    reusable across features
     ├── components/            create/edit dialog, details drawer, confirm dialog, ApplicationDialogs,
     │                          change-password dialog (lazy), PasswordRules checklist
@@ -63,6 +63,7 @@ component ──calls──▶ ApplicationStore ──▶ ApplicationApiService 
 - **Mutations return Promises** (`await store.move(...)`): they run immediately and cannot be forgotten like an unsubscribed Observable. HTTP itself stays RxJS.
 - **Optimistic drag and drop:** `store.move()` updates the board at once, sends `PATCH /move`, takes the server's copy (new `version`) on success, rolls back on failure, and reloads the board on 404/409.
 - **The stats strip is derived** from the store's counts: no request, and it updates instantly after create, delete and move. Same formula as the backend's `GET /stats`.
+- **The board's welcome band** greets the user by first name (time of day from the browser) and shows "N follow-ups due" from `NotificationStore.due()`, the bell's own list. That pill opens the bell through `HeaderMenus` (`core/layout`), a UI-only signal the shell answers by calling its menu trigger, so the board needs no reference to the header.
 - **The list page** keeps search, status, sort and page in the URL, so refresh, back/forward and shared links restore the view. It fetches pages directly through `ApplicationApiService.list()`: a page of search results is a view of the server, not shared state.
 - **Notification bell:** `NotificationStore` holds the server's `GET /notifications` result (`interviews`, `due`, `upcoming`; `badgeCount` = due follow-ups + interviews whose `daysUntil` is 0). The menu lists Interviews (time in the browser's zone via `interviewLabel`: "Today · 7:45 PM"; no dismiss button, the server drops an interview once it starts), then Follow-ups due (with Dismiss all), then Upcoming follow-ups. The shell reloads it on sign-in, whenever the menu opens, and after every board change: `ApplicationStore.revision` is bumped after each successful create, update, delete or move, and an `effect` in the shell watches it. That keeps the board store free of any knowledge of notifications. The server decides what is due (in its configured zone), so the client does no date arithmetic. Clicking an item opens the details drawer; dismiss calls `DELETE /notifications/{id}`.
 - **On logout** the store resets (registered through `AuthService.onLogout`), and responses that arrive after a logout are dropped, so one user's data never shows for the next.

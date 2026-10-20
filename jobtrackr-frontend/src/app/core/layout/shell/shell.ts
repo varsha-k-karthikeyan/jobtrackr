@@ -1,10 +1,10 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
 import { firstName, personInitials } from '../../../shared/utils/person';
@@ -13,6 +13,7 @@ import { DEMO_CREDENTIALS } from '../../auth/demo-credentials';
 import { Notifier } from '../../notifications/notifier';
 import { followUpLabel, interviewLabel, NotificationStore } from '../../notifications/notification-store';
 import { ApplicationStore } from '../../state/application-store';
+import { HeaderMenus } from '../header-menus';
 
 // Layout for the signed-in part of the app: header with the logo, the Board/List switch, the notification bell
 // and the account menu, then the
@@ -51,6 +52,8 @@ export class Shell {
   });
   /** Open menus restyle their trigger (tinted, accent border, chevron up); set from the menu's own events. */
   protected readonly bellOpen = signal(false);
+  private readonly bellTrigger = viewChild.required('bellTrigger', { read: MatMenuTrigger });
+  private readonly headerMenus = inject(HeaderMenus);
   protected readonly accountOpen = signal(false);
 
   protected readonly due = this.notifications.due;
@@ -69,6 +72,12 @@ export class Shell {
     effect(() => {
       this.applications.revision();
       untracked(() => void this.notifications.load());
+    });
+    // A page asked for the bell (the board's "N follow-ups due" pill); 0 means nobody has asked yet
+    effect(() => {
+      if (this.headerMenus.bellRequests() > 0) {
+        untracked(() => this.bellTrigger().openMenu());
+      }
     });
   }
 

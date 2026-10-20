@@ -1,6 +1,5 @@
 import { PercentPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
 import { Stats } from '../../../core/models/stats.model';
 import { ApplicationStore } from '../../../core/state/application-store';
 
@@ -9,7 +8,7 @@ import { ApplicationStore } from '../../../core/state/application-store';
 // delete and drag. The formula matches the backend's StatsService exactly.
 @Component({
   selector: 'app-stats-strip',
-  imports: [PercentPipe, MatIconModule],
+  imports: [PercentPipe],
   templateUrl: './stats-strip.html',
   styleUrl: './stats-strip.scss',
 })

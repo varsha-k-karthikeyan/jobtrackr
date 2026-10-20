@@ -4,12 +4,44 @@
 // Written as plain CSS rather than Tailwind classes because the same rules are needed by the
 // skeleton and the real board, and the drag classes (.cdk-drag-*) can only be styled here.
 
+// "N follow-ups due" in the band: the due-today pill colours, as a real button that opens the bell
+.due-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 32px;
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-due-soft);
+  color: var(--color-due-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
 .board-columns {
   display: flex;
   gap: 1rem;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding-bottom: 0.5rem;
+  padding: 0.25rem 0.125rem 0.5rem;
 
   @media (min-width: 768px) {
     display: grid;
@@ -18,33 +50,68 @@
   }
 }
 
-// A column is a vertical flex box: header on top, the drop list fills ALL remaining height (see .card-list).
-// Columns already stretch to the tallest one (grid/flex default), and the min-height keeps a generous
-// drop target on a board with few cards, roughly down to the bottom of the viewport.
+// A column is a white card with a 4px strip in its status colour on top. It is a vertical flex box: header,
+// then the drop list filling ALL remaining height (see .card-list). Columns stretch to the tallest one, and
+// the min-height keeps a generous drop target on a board with few cards.
 .board-column {
+  --status-colour: var(--color-applied);
+  --status-soft: var(--color-applied-soft);
+  --status-ink: var(--color-applied-ink);
+
   display: flex;
   flex-direction: column;
   flex: 0 0 min(85vw, 20rem);
-  min-height: max(20rem, calc(100dvh - 21rem));
+  min-height: max(24rem, calc(100dvh - 26rem));
   scroll-snap-align: start;
-  padding: 0.75rem;
-  border-radius: var(--mat-sys-corner-large);
-  background: var(--mat-sys-surface-container);
+  overflow: hidden;
+  border-top: 4px solid var(--status-colour);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+
+  &[data-status='INTERVIEW'] {
+    --status-colour: var(--color-interview);
+    --status-soft: var(--color-interview-soft);
+    --status-ink: var(--color-interview-ink);
+  }
+
+  &[data-status='OFFER'] {
+    --status-colour: var(--color-offer);
+    --status-soft: var(--color-offer-soft);
+    --status-ink: var(--color-offer-ink);
+  }
+
+  &[data-status='REJECTED'] {
+    --status-colour: var(--color-rejected);
+    --status-soft: var(--color-rejected-soft);
+    --status-ink: var(--color-rejected-ink);
+  }
 }
 
-.count-badge {
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 56px;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+}
+
+// Count in the column's status colours; the number is also read out ("4 applications")
+.count-pill {
   min-width: 1.5rem;
-  padding: 0 0.5rem;
-  border-radius: 999px;
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
-  font: var(--mat-sys-label-medium);
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--status-soft);
+  color: var(--status-ink);
+  font-size: 12px;
+  font-weight: 700;
   text-align: center;
 }
 
-// Compact "+" next to each column's count
 .column-add-button {
-  @include mat.icon-button-density(-3);
+  @include mat.icon-button-overrides((
+    icon-color: var(--color-heading),
+  ));
 }
 
 // The cdkDropList. CDK only accepts a drop while the pointer is inside this element, so it must cover the
@@ -56,42 +123,46 @@
   flex-direction: column;
   gap: 0.75rem;
   min-height: 6rem;
+  padding: 0.75rem;
+  background: var(--color-column);
 }
 
+// Empty column: a dashed box with the hint, filling the column so it reads as one big drop target
 .empty-column {
-  flex: 1 1 auto; // the "Drop applications here" hint fills the empty column too
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
   min-height: 6rem;
-  border: 2px dashed var(--mat-sys-outline-variant);
-  border-radius: var(--mat-sys-corner-medium);
-  color: var(--mat-sys-on-surface-variant);
-  font: var(--mat-sys-body-small);
+  border: 2px dashed var(--color-button-line);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-subtle);
+  font-size: 14px;
+  text-align: center;
 }
 
 .skeleton-block {
-  background: var(--mat-sys-surface-container-highest);
+  background: var(--color-progress-track);
 }
 
 // ---- Drag and drop ----
 
 // Where the card will land. CDK's default placeholder is a same-size copy of the dragged card, which keeps
 // its sorting maths exact (a custom placeholder of a different height makes drop slots drift), so it is
-// only restyled here: faded, with a dashed outline.
+// only restyled here: faded, with a dashed accent outline.
 .cdk-drag-placeholder {
-  opacity: 0.35;
-  outline: 2px dashed var(--mat-sys-primary);
+  opacity: 0.4;
+  outline: 2px dashed var(--color-accent);
   outline-offset: -2px;
-  border-radius: var(--mat-sys-corner-medium);
+  border-radius: var(--radius-field);
 }
 
 // The copy that follows the pointer (rendered in <body>, keeps this component's style scope)
 .cdk-drag-preview {
-  box-shadow: var(--mat-sys-level3);
-  border-radius: var(--mat-sys-corner-medium);
+  box-shadow: var(--shadow-menu);
+  border-radius: var(--radius-field);
   transform: rotate(2deg);
 }
 

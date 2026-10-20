@@ -165,6 +165,12 @@ body {
   background: var(--color-backdrop);
 }
 
+// The bell's count badge gets a 2px white ring so it stands off the button's border. Global because MatBadge
+// creates the badge element itself, outside the shell template's style encapsulation.
+.header-bell .mat-badge-content {
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
 // Material Symbols is a variable font: weight 400 and the outlined style match the design's line icons
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

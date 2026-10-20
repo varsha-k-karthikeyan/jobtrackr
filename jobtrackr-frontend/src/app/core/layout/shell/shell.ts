@@ -1,21 +1,21 @@
-import { Component, computed, effect, inject, untracked } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
+import { firstName, personInitials } from '../../../shared/utils/person';
 import { AuthService } from '../../auth/auth-service';
 import { DEMO_CREDENTIALS } from '../../auth/demo-credentials';
 import { Notifier } from '../../notifications/notifier';
 import { followUpLabel, interviewLabel, NotificationStore } from '../../notifications/notification-store';
 import { ApplicationStore } from '../../state/application-store';
 
-// Layout for the signed-in part of the app: toolbar with the notification bell and the user menu, then the
+// Layout for the signed-in part of the app: header with the logo, the Board/List switch, the notification bell
+// and the account menu, then the
 // routed page.
 @Component({
   selector: 'app-shell',
@@ -23,8 +23,6 @@ import { ApplicationStore } from '../../state/application-store';
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
-    MatTabsModule,
-    MatToolbarModule,
     MatBadgeModule,
     MatButtonModule,
     MatDividerModule,
@@ -42,11 +40,18 @@ export class Shell {
   private readonly notifier = inject(Notifier);
 
   protected readonly user = this.auth.user;
-  // Null until /me answers; the menu shows a neutral label meanwhile
+  // Null until /me answers; the header shows a neutral label meanwhile
   protected readonly displayName = computed(() => {
     const user = this.user();
-    return user ? (user.fullName ?? user.email) : 'Signed in';
+    return user ? firstName(user.fullName, user.email) : 'Signed in';
   });
+  protected readonly initials = computed(() => {
+    const user = this.user();
+    return user ? personInitials(user.fullName, user.email) : '';
+  });
+  /** Open menus restyle their trigger (tinted, accent border, chevron up); set from the menu's own events. */
+  protected readonly bellOpen = signal(false);
+  protected readonly accountOpen = signal(false);
 
   protected readonly due = this.notifications.due;
   protected readonly upcoming = this.notifications.upcoming;

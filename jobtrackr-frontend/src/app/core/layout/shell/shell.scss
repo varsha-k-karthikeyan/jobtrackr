@@ -1,15 +1,103 @@
-// Toolbar and tabs share one background so the sticky header reads as a single bar
-.app-header {
-  background: var(--mat-sys-surface);
+@use '@angular/material' as mat;
+
+// Header pieces. Layout is in Tailwind on plain elements; these rules cover states (active, open, focus)
+// and the Material bell button, which is themed through its tokens instead of Tailwind utilities.
+
+.logo {
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+  }
+
+  .logo-tile mat-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 22px;
+  }
 }
 
-// Overdue follow-ups in the bell menu, in the theme's error colour (on a plain span, not a Material element)
+// Board / List segmented switch
+.segment {
+  color: var(--color-muted);
+  font-weight: 600;
+  transition: background-color 120ms ease, color 120ms ease;
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+  }
+
+  &:hover {
+    color: var(--color-body);
+  }
+
+  &.is-active {
+    background: var(--color-surface);
+    color: var(--color-heading);
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+}
+
+// Bell: a 44px white circle with a 1px border (Material icon button sized through its tokens)
+.header-bell {
+  @include mat.icon-button-overrides((
+    state-layer-size: 44px,
+    icon-color: var(--color-heading),
+  ));
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+
+  &.is-open {
+    border-color: var(--color-accent);
+    background: var(--color-band);
+    box-shadow: var(--shadow-focus);
+  }
+}
+
+// Account pill: hover tint, and the same "open" look as the bell; the chevron flips up while open
+.account-trigger {
+  cursor: pointer;
+  font: inherit;
+  transition: background-color 120ms ease, border-color 120ms ease;
+
+  &:hover {
+    background: var(--color-surface-subtle);
+  }
+
+  &.is-open,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    background: var(--color-band);
+    box-shadow: var(--shadow-focus);
+  }
+
+  .account-chevron {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    transition: transform 150ms ease;
+  }
+
+  &.is-open .account-chevron {
+    transform: rotate(180deg);
+  }
+}
+
+// Overdue follow-ups in the bell menu (restyled with the rest of the menu in a later stage)
 .follow-up-overdue {
-  color: var(--mat-sys-error);
+  color: var(--color-danger);
 }
 
-// Today's interviews in the bell menu stand out in the theme's primary colour
+// Today's interviews in the bell menu
 .interview-today {
-  color: var(--mat-sys-primary);
-  font-weight: 500;
+  color: var(--color-accent);
+  font-weight: 600;
 }

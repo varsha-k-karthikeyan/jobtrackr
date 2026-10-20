@@ -1,18 +1,44 @@
-<!-- The wrapper owns positioning (Tailwind); Material components keep their own styling untouched -->
-<header class="app-header sticky top-0 z-10 shadow-sm">
-  <mat-toolbar>
-    <a routerLink="/board" class="flex items-center gap-2 no-underline text-inherit">
-      <mat-icon aria-hidden="true">work_outline</mat-icon>
-      <span class="font-semibold tracking-tight">JobTrackr</span>
+<!-- Plain elements carry the layout (Tailwind); Material buttons are themed through their tokens in shell.scss -->
+<header class="sticky top-0 z-10 border-b border-line bg-surface">
+  <!-- Wraps on phones: logo and buttons on the first row, the Board/List switch full width below -->
+  <div class="mx-auto flex min-h-[67px] w-full max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-8">
+    <a routerLink="/board" class="logo order-1 flex items-center gap-2.5 rounded-tile no-underline" aria-label="JobTrackr, go to the board">
+      <span class="logo-tile flex size-[38px] items-center justify-center rounded-tile bg-accent text-on-accent">
+        <mat-icon aria-hidden="true">work</mat-icon>
+      </span>
+      <span class="text-[21px] font-extrabold tracking-tight text-body" aria-hidden="true">Job<span class="text-accent">Trackr</span></span>
     </a>
 
-    <span class="flex-1"></span>
+    <!-- Board / List: links, so each view keeps its own URL and works with back/forward -->
+    <nav class="order-3 flex w-full gap-1 rounded-button bg-segment p-1 sm:order-2 sm:w-auto" aria-label="Views">
+      <a
+        routerLink="/board"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        class="segment flex flex-1 items-center justify-center gap-2 rounded-tile px-4 py-2 text-sm no-underline sm:flex-none"
+      >
+        <mat-icon aria-hidden="true">view_kanban</mat-icon>Board
+      </a>
+      <a
+        routerLink="/list"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="{ paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored' }"
+        class="segment flex flex-1 items-center justify-center gap-2 rounded-tile px-4 py-2 text-sm no-underline sm:flex-none"
+      >
+        <mat-icon aria-hidden="true">table_rows</mat-icon>List
+      </a>
+    </nav>
 
+    <div class="order-2 ml-auto flex items-center gap-3 sm:order-3">
     <!-- Interviews and follow-ups. Opening the menu refreshes the lists (the date may have rolled over). -->
     <button
       mat-icon-button
+      class="header-bell"
+      [class.is-open]="bellOpen()"
       [matMenuTriggerFor]="notificationMenu"
-      (menuOpened)="refreshNotifications()"
+      (menuOpened)="bellOpen.set(true); refreshNotifications()"
+      (menuClosed)="bellOpen.set(false)"
       [attr.aria-label]="notificationsLabel()"
     >
       <mat-icon
@@ -95,10 +121,21 @@
       }
     </mat-menu>
 
-    <!-- Name next to the icon on wider screens; the icon alone on phones -->
-    <span class="mr-1 hidden max-w-48 truncate text-sm sm:inline">{{ displayName() }}</span>
-    <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="Account menu">
-      <mat-icon>account_circle</mat-icon>
+    <!-- A plain button (not Material): a pill with the avatar, the first name (hidden on phones) and a chevron -->
+    <button
+      type="button"
+      class="account-trigger flex min-h-11 items-center gap-2 rounded-pill border border-line bg-surface py-1 pl-1 pr-3"
+      [class.is-open]="accountOpen()"
+      [matMenuTriggerFor]="userMenu"
+      (menuOpened)="accountOpen.set(true)"
+      (menuClosed)="accountOpen.set(false)"
+      [attr.aria-label]="'Account menu, ' + displayName()"
+    >
+      <span class="flex size-[34px] items-center justify-center rounded-pill bg-accent text-[13px] font-bold text-on-accent" aria-hidden="true">
+        {{ initials() }}
+      </span>
+      <span class="hidden max-w-40 truncate text-sm font-semibold text-body sm:inline" aria-hidden="true">{{ displayName() }}</span>
+      <mat-icon class="account-chevron text-muted" aria-hidden="true">expand_more</mat-icon>
     </button>
     <mat-menu #userMenu="matMenu" xPosition="before">
       @if (user(); as signedIn) {
@@ -131,28 +168,11 @@
         <span>Log out</span>
       </button>
     </mat-menu>
-  </mat-toolbar>
-
-  <!-- Board / List switch: tab links, so each view has its own URL and works with back/forward -->
-  <nav mat-tab-nav-bar [tabPanel]="tabPanel" mat-stretch-tabs="false" mat-align-tabs="start" aria-label="Views">
-    <a mat-tab-link routerLink="/board" routerLinkActive #boardLink="routerLinkActive" [active]="boardLink.isActive">
-      <mat-icon class="mr-2" aria-hidden="true">view_kanban</mat-icon>Board
-    </a>
-    <a
-      mat-tab-link
-      routerLink="/list"
-      routerLinkActive
-      #listLink="routerLinkActive"
-      [active]="listLink.isActive"
-      [routerLinkActiveOptions]="{ paths: 'exact', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored' }"
-    >
-      <mat-icon class="mr-2" aria-hidden="true">table_rows</mat-icon>List
-    </a>
-  </nav>
+    </div>
+  </div>
 </header>
 
-<mat-tab-nav-panel #tabPanel>
-  <main class="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 sm:py-6">
-    <router-outlet />
-  </main>
-</mat-tab-nav-panel>
+<!-- Same width and side padding as the header, so page content lines up under the logo -->
+<main class="mx-auto w-full max-w-[1440px] px-4 py-4 sm:px-8 sm:py-6">
+  <router-outlet />
+</main>

@@ -34,7 +34,7 @@ src/app/
 │   ├── auth/                  AuthService (signals), token storage, demo credentials
 │   ├── guards/                authGuard, guestGuard, safeReturnUrl
 │   ├── interceptors/          authInterceptor (Bearer + 401), errorInterceptor (snackbar)
-│   ├── layout/shell/          toolbar, notification bell, user menu, Board/List tabs, router outlet
+│   ├── layout/shell/          header (logo, Board/List switch, notification bell, account menu), router outlet
 │   ├── models/                TypeScript mirrors of the backend's DTO records
 │   ├── notifications/         Notifier (lazily loaded snackbar), NotificationStore (the bell: interviews and follow-ups)
 │   ├── state/                 ApplicationStore + pure board transforms (board-state.ts)

@@ -8,19 +8,19 @@
 
 ## Screenshots
 
-<!-- Screenshots go in docs/screenshots/ (the list and the GIF script are in docs/screenshots/README.md).
-     Uncomment each line once its file exists, so GitHub never shows a broken image.
-![Kanban board](docs/screenshots/board.png)
+All taken from the public demo account (sample data only). How they were captured, and the script for a short tour GIF, are in [docs/screenshots](docs/screenshots/README.md).
+
+![Kanban board with the welcome band and stats](docs/screenshots/board.png)
 ![Dragging a card between columns](docs/screenshots/drag.png)
-![Details drawer with notes](docs/screenshots/drawer.png)
-![List with filters and the salary slider](docs/screenshots/list-filters.png)
-![Follow-up notifications](docs/screenshots/bell.png)
+![Details panel with the job description and notes](docs/screenshots/drawer.png)
+![List with a search, the salary filter and a sorted column](docs/screenshots/list-filters.png)
+![Notification bell with interviews and due follow-ups](docs/screenshots/bell.png)
 ![Login with Try the demo](docs/screenshots/login.png)
 ![Swagger UI](docs/screenshots/swagger.png)
+
+<!-- Uncomment once docs/screenshots/demo.gif exists (script in docs/screenshots/README.md):
 ![30-second tour](docs/screenshots/demo.gif)
 -->
-
-_Screenshots are being added; see [docs/screenshots](docs/screenshots/README.md)._
 
 ## Features
 

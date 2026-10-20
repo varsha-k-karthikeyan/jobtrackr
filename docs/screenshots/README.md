@@ -1,35 +1,36 @@
 # Screenshots
 
-Images used by the main [README](../../README.md). Once a file below exists, uncomment its line in the README's "Screenshots" section (it is commented out so GitHub never shows a broken image).
+Images used by the main [README](../../README.md). All are taken from the public demo account (**Try the demo**), so they show the same sample data and nothing personal. The approved designs these screens follow are in [`docs/design/`](../design).
 
-## How to capture
+## How they were captured
 
-- Run the full stack (`docker compose --profile full up --build`), open http://localhost:4200 and use **Try the demo**, so every image shows the same public sample data and nothing personal.
-- Browser window about 1440 x 900, zoom 100%, light theme. Hide bookmarks bars and extensions.
-- PNG for screenshots. Crop to the app (no browser chrome) except where noted.
-- Keep each file under about 1 MB (a PNG optimiser such as `oxipng` or squoosh.app helps), and the GIF under about 8 MB so it loads quickly on GitHub.
+- The app running locally (`docker compose up -d`, the backend, `npm start`), signed in with **Try the demo**.
+- A headless Edge window of 1440 x 900 at 100% zoom, light colour scheme, captured as PNG straight from the page, so there is no browser chrome. Each file is under 200 kB.
+- For `bell.png`, the Postman card was given a temporary interview tomorrow at 11:15 AM so both sections of the menu show; it was removed again afterwards, so the demo data is unchanged.
+
+To retake them after a visual change, use the same window size and the demo account, and keep the same file names.
 
 ## The list
 
-| File | What to show |
+| File | What it shows |
 |---|---|
-| `board.png` | The board with all four columns filled, the stats strip, and at least one red "Overdue" follow-up chip |
-| `drag.png` | A card mid-drag between two columns, with the drop placeholder visible in the target column |
-| `drawer.png` | The details drawer open on a card that has two or three notes |
-| `list-filters.png` | The List view with a search term, a status filter, the salary slider moved, and a sorted column |
-| `bell.png` | The header bell with its red count, menu open, showing due items (one in red) and the "Upcoming" section |
-| `login.png` | The login page with the "Try the demo" button and "Forgot password?" link |
-| `swagger.png` | Swagger UI at http://localhost:8080/swagger-ui.html with the endpoint groups expanded (browser chrome may stay, it shows the URL) |
-| `demo.gif` | The 30 to 60 second tour below |
+| `board.png` | The board: welcome band with the greeting, "N follow-ups due" and the stats; four status columns with job cards and overdue / interview pills |
+| `drag.png` | A card mid-drag between two columns, with the dashed drop placeholder in the target column |
+| `drawer.png` | The details panel on a card with a job description and three notes |
+| `list-filters.png` | The List view with a search term, the salary filter moved (20+ LPA) and the table sorted by max salary |
+| `bell.png` | The bell menu open: an interview tomorrow, and the due follow-ups with their initials tiles and overdue pills |
+| `login.png` | The login page with "Forgot password?" and the "Try the demo" button |
+| `swagger.png` | Swagger UI at http://localhost:8080/swagger-ui.html with the endpoint groups |
+| `demo.gif` | Not recorded yet: the 30 to 60 second tour below (its line in the README is commented out until it exists) |
 
 ## GIF script (30 to 60 seconds)
 
-Record at 1280 x 800 with a screen recorder that exports GIF (for example ScreenToGif on Windows), 10 to 15 frames per second.
+Record at 1280 x 800 with a screen recorder that exports GIF (for example ScreenToGif on Windows), 10 to 15 frames per second, and keep it under about 8 MB.
 
 1. **0-5 s** Login page. Pause a moment on it, then click **Try the demo**.
 2. **5-15 s** The board appears. Slowly drag an Applied card into the Interview column and drop it; let the card settle.
-3. **15-25 s** Click a card. The details drawer slides in; scroll its notes, then close it.
-4. **25-40 s** Click the bell. The menu shows due and overdue follow-ups; click the X on one of them and let the count drop by one.
+3. **15-25 s** Click a card. The details panel slides in; scroll to its notes, then close it.
+4. **25-40 s** Click the bell. The menu shows interviews and due follow-ups; click the X on one follow-up and let the count drop by one.
 5. **40-50 s** Switch to **List**, type a company name into the search box and watch the table filter.
 6. **50-60 s** Reload the page to show you are still signed in. End on the board.
 

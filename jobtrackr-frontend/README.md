@@ -46,7 +46,8 @@ src/app/
 │   └── stats/                 stats strip shown in the board's welcome band
 └── shared/                    reusable across features
     ├── components/            create/edit dialog, details drawer, confirm dialog, ApplicationDialogs,
-    │                          change-password dialog (lazy), PasswordRules checklist
+    │                          change-password dialog (lazy), PasswordRules checklist (rules box with a
+    │                          strength bar, one segment per met rule; used by register, reset and change)
     ├── utils/                 dates (local calendar logic), salary formatting, dd/mm/yyyy date adapter
     └── validators/            password strength (mirrors the backend rule), matchesControl (confirm field)
 ```

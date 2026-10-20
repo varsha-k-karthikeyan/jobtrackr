@@ -17,9 +17,11 @@ import { PasswordRules } from '../password-rules/password-rules';
 /** Opens the dialog. Resolves (through afterClosed) to true when the password was changed. */
 export function openChangePasswordDialog(dialog: MatDialog): MatDialogRef<ChangePasswordDialog, boolean> {
   return dialog.open<ChangePasswordDialog, void, boolean>(ChangePasswordDialog, {
-    width: 'min(28rem, 100vw)',
+    width: 'min(35rem, 100vw)',
     maxWidth: '100vw',
     autoFocus: 'first-tabbable',
+    // Header tile, divider and grey footer shared with the add/edit dialog (styles/_form-dialog.scss)
+    panelClass: 'app-form-dialog',
   });
 }
 
@@ -38,6 +40,16 @@ export function openChangePasswordDialog(dialog: MatDialog): MatDialogRef<Change
     PasswordRules,
   ],
   templateUrl: './change-password-dialog.html',
+  styles: `
+    // The info icon in the "other devices will be signed out" note, aligned with the first line of text
+    .info-icon {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      font-size: 18px;
+    }
+  `,
 })
 export class ChangePasswordDialog {
   private readonly auth = inject(AuthService);

@@ -1,41 +1,175 @@
-// The slider fills the space between its label and the summary. Width only: Material's own side margins
-// stay, because they keep the end thumbs inside the slider (with margin: 0 the "100+" thumb overflowed).
+@use '@angular/material' as mat;
+
+// ---- Filters in the band ----
+
+// The white boxes behind the filters. The search field is a Material outlined field, which is transparent,
+// so the wrapper supplies the white and its outline is themed to the band's border colour.
+.filter-box {
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+}
+
+.search-box {
+  @include mat.form-field-overrides((
+    outlined-outline-color: var(--color-band-line),
+    outlined-hover-outline-color: var(--color-field-line),
+  ));
+  // 48px instead of 56px: no floating label here, the placeholder says what to type
+  @include mat.form-field-density(-2);
+}
+
+// The other two boxes draw the band-coloured border themselves (the search field has its own outline)
+.filter-box:not(.search-box) {
+  box-shadow: inset 0 0 0 1px var(--color-band-line);
+}
+
+// Status segments: accent fill on the selected one, no borders between them
+.status-segments {
+  @include mat.button-toggle-overrides((
+    shape: 10px,
+    height: 38px,
+    background-color: transparent,
+    text-color: var(--color-body),
+    selected-state-background-color: var(--color-accent),
+    selected-state-text-color: var(--color-on-accent),
+    divider-color: transparent,
+    label-text-weight: 600,
+    label-text-size: 14px,
+  ));
+  border: 0;
+  white-space: nowrap;
+}
+
+// The slider fills the box below its label; Material keeps its own side margins, which keep the end thumbs
+// inside the slider (with margin: 0 the "100+" thumb overflowed).
 .salary-slider {
   display: block;
   width: auto;
+  @include mat.slider-overrides((
+    inactive-track-color: var(--color-band-line),
+    handle-color: var(--color-surface),
+    focus-handle-color: var(--color-surface),
+    hover-handle-color: var(--color-surface),
+    with-overlap-handle-outline-color: var(--color-accent),
+    with-overlap-handle-outline-width: 2px,
+  ));
 }
 
-// Beside the slider (from 640px) it has a fixed width and is right-aligned, so the row does not shift while
-// the text changes during a drag. Stacked under the slider on phones it simply starts at the left.
-.salary-summary {
-  @media (min-width: 640px) {
-    min-width: 8.5rem;
-    text-align: right;
+// "Clear" next to the salary summary: a real button that looks like a link
+.text-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
   }
 }
 
+// ---- Table ----
+
 .table-card {
   overflow: hidden;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: var(--mat-sys-corner-large);
-  background: var(--mat-sys-surface);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  @include mat.table-overrides((
+    background-color: var(--color-surface),
+    header-container-height: 48px,
+    header-headline-color: var(--color-label),
+    header-headline-size: 12px,
+    header-headline-weight: 700,
+    header-headline-tracking: 0.06em,
+    row-item-container-height: 64px,
+    row-item-label-text-color: var(--color-secondary),
+    row-item-label-text-size: 14px,
+    row-item-outline-color: var(--color-divider),
+  ));
+  @include mat.sort-overrides((
+    arrow-color: var(--color-accent),
+  ));
 }
 
-// Amounts line up on the right, like numbers in a spreadsheet
-.numeric-cell {
-  text-align: right;
-  white-space: nowrap;
+// Header row: subtle surface, upper-case labels; the sorted column's label turns accent (with its arrow)
+.header-row {
+  background: var(--color-surface-subtle);
+
+  th {
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  th[aria-sort='ascending'],
+  th[aria-sort='descending'] {
+    color: var(--color-accent);
+  }
+}
+
+// The salary header: a plain button with the column's label, opening the min/max sort menu
+.salary-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 .clickable-row {
   cursor: pointer;
 
   &:hover {
-    background: var(--mat-sys-surface-container-low);
+    background: var(--color-row-hover);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--mat-sys-primary);
+    outline: 2px solid var(--color-accent);
     outline-offset: -2px;
   }
+}
+
+// ---- Footer and paginator ----
+
+.table-footer {
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-surface-subtle);
+}
+
+.list-paginator {
+  @include mat.paginator-overrides((
+    container-background-color: transparent,
+    container-text-color: var(--color-secondary),
+    container-text-size: 13px,
+    enabled-icon-color: var(--color-heading),
+  ));
+  // Previous/next: 34px outlined squares with 8px corners (Material keeps the 48px touch target around them)
+  @include mat.icon-button-overrides((
+    state-layer-size: 34px,
+    container-shape: 8px,
+  ));
+  // The outlined look of the buttons and the hidden range label are in styles.scss: those elements live in
+  // the paginator's own template, which this component's encapsulated styles cannot reach.
 }

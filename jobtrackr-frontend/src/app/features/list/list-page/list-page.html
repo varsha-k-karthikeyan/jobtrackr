@@ -1,89 +1,99 @@
-<!-- Centred at the header's width; restyled with a band like the board in the next stage -->
-<section class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-8 sm:py-6">
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex items-baseline gap-3">
-      <h1 class="m-0 text-2xl font-semibold">List</h1>
-      <span class="text-sm opacity-70">{{ totalElements() }} {{ totalElements() === 1 ? 'result' : 'results' }}</span>
+<!-- Band: title, result count, Add application, and every filter. Full width, content centred at the header's width. -->
+<section class="border-b border-band-line bg-band" aria-labelledby="list-title">
+  <div class="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-4 py-7 sm:px-8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 id="list-title" class="m-0 text-[30px] leading-tight font-extrabold tracking-tight text-heading">All applications</h1>
+        <p class="m-0 mt-1 text-[15px] text-secondary" aria-live="polite">
+          {{ totalElements() }} {{ totalElements() === 1 ? 'result' : 'results' }}
+        </p>
+      </div>
+      <button mat-flat-button type="button" (click)="addApplication()">
+        <mat-icon>add</mat-icon>
+        Add application
+      </button>
     </div>
-    <button mat-flat-button type="button" (click)="addApplication()">
-      <mat-icon>add</mat-icon>
-      Add application
-    </button>
-  </div>
 
-  <!-- Filters -->
-  <!-- gap-y-4: when the filters wrap onto two lines (phones), the Status label needs room above it -->
-  <div class="flex flex-wrap items-start gap-x-4 gap-y-4">
-    <mat-form-field appearance="outline" class="min-w-0 flex-1 basis-64" subscriptSizing="dynamic">
-      <mat-label>Search company, role, location, source or status</mat-label>
-      <mat-icon matIconPrefix aria-hidden="true">search</mat-icon>
-      <input matInput type="search" [formControl]="searchControl" autocomplete="off" />
-      @if (searchControl.value) {
-        <button mat-icon-button matIconSuffix type="button" (click)="searchControl.setValue('')" aria-label="Clear search">
-          <mat-icon>close</mat-icon>
-        </button>
-      }
-    </mat-form-field>
+    <!-- Filters: search, status, salary. On narrow screens each takes a full row. -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- The white wrapper fills the outlined field, which Material draws transparent -->
+      <div class="filter-box search-box min-w-0 flex-[1_1_20rem]">
+        <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+          <mat-icon matIconPrefix aria-hidden="true">search</mat-icon>
+          <input
+            matInput
+            type="search"
+            [formControl]="searchControl"
+            autocomplete="off"
+            placeholder="Search company, role, location, source or status"
+            aria-label="Search company, role, location, source or status"
+          />
+          @if (searchControl.value) {
+            <button mat-icon-button matIconSuffix type="button" (click)="searchControl.setValue('')" aria-label="Clear search">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+      </div>
 
-    <mat-form-field appearance="outline" class="w-full sm:w-48" subscriptSizing="dynamic">
-      <mat-label>Status</mat-label>
-      <mat-select [value]="query().status" (selectionChange)="onStatusChange($event.value)">
-        <mat-option [value]="null">All statuses</mat-option>
-        @for (status of statuses; track status) {
-          <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-  </div>
-
-  <!-- Salary range: a job matches when its own salary range overlaps the selected one.
-       The URL changes when a thumb is released; the summary follows the thumbs while dragging. -->
-  <div class="salary-filter flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-    <span id="salary-filter-label" class="whitespace-nowrap text-sm font-medium">Salary range (LPA)</span>
-    <div class="min-w-0 flex-1">
-      <mat-slider
-        class="salary-slider"
-        [min]="0"
-        [max]="salarySliderMax"
-        [step]="1"
-        discrete
-        [displayWith]="formatSliderValue"
-        aria-labelledby="salary-filter-label"
-      >
-        <input
-          matSliderStartThumb
-          [value]="sliderFrom()"
-          (input)="onThumbInput('from', $event)"
-          (valueChange)="sliderFrom.set($event); onSalaryChange()"
-          aria-label="Minimum salary in LPA"
-        />
-        <input
-          matSliderEndThumb
-          [value]="sliderTo()"
-          (input)="onThumbInput('to', $event)"
-          (valueChange)="sliderTo.set($event); onSalaryChange()"
-          aria-label="Maximum salary in LPA"
-        />
-      </mat-slider>
-    </div>
-    <div class="flex items-center gap-2">
-      <span class="salary-summary whitespace-nowrap text-sm" aria-live="polite">{{ salarySummary() }}</span>
-      <!-- Always rendered, only hidden: if the button appeared and disappeared, the slider's width would
-           change while its thumbs stay where they were drawn, leaving the right thumb under this text -->
-      <span [class.invisible]="!salaryFilterActive()" [attr.aria-hidden]="!salaryFilterActive()">
-        <button
-          mat-button
-          type="button"
-          (click)="clearSalary()"
-          [disabled]="!salaryFilterActive()"
-          aria-label="Clear salary range"
+      <!-- Status as a segmented control. Same ?status= parameter as before; "All" removes it. -->
+      <div class="filter-box flex min-w-0 items-center overflow-x-auto p-1">
+        <mat-button-toggle-group
+          class="status-segments"
+          [value]="query().status ?? allStatuses"
+          (change)="onStatusChange($event.value === allStatuses ? null : $event.value)"
+          hideSingleSelectionIndicator
+          aria-label="Filter by status"
         >
-          Clear
-        </button>
-      </span>
+          <mat-button-toggle [value]="allStatuses">All</mat-button-toggle>
+          @for (status of statuses; track status) {
+            <mat-button-toggle [value]="status">{{ statusLabels[status] }}</mat-button-toggle>
+          }
+        </mat-button-toggle-group>
+      </div>
+
+      <!-- Salary range: a job matches when its own salary range overlaps the selected one.
+           The URL changes when a thumb is released; the summary follows the thumbs while dragging. -->
+      <div class="filter-box salary-box flex min-w-0 flex-[1_1_18rem] flex-col justify-center px-4 pt-2 pb-0.5">
+        <div class="flex items-center justify-between gap-3">
+          <span id="salary-filter-label" class="text-[13px] font-semibold text-body">Salary (LPA)</span>
+          <span class="flex items-center gap-2">
+            <span class="salary-summary text-[13px] font-bold text-accent" aria-live="polite">{{ salarySummary() }}</span>
+            @if (salaryFilterActive()) {
+              <button type="button" class="text-link-button" (click)="clearSalary()" aria-label="Clear salary range">Clear</button>
+            }
+          </span>
+        </div>
+        <mat-slider
+          class="salary-slider"
+          [min]="0"
+          [max]="salarySliderMax"
+          [step]="1"
+          discrete
+          [displayWith]="formatSliderValue"
+          aria-labelledby="salary-filter-label"
+        >
+          <input
+            matSliderStartThumb
+            [value]="sliderFrom()"
+            (input)="onThumbInput('from', $event)"
+            (valueChange)="sliderFrom.set($event); onSalaryChange()"
+            aria-label="Minimum salary in LPA"
+          />
+          <input
+            matSliderEndThumb
+            [value]="sliderTo()"
+            (input)="onThumbInput('to', $event)"
+            (valueChange)="sliderTo.set($event); onSalaryChange()"
+            aria-label="Maximum salary in LPA"
+          />
+        </mat-slider>
+      </div>
     </div>
   </div>
+</section>
 
+<section class="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-6 sm:px-8" aria-label="Applications">
   @if (error(); as message) {
     <div class="app-error-banner" role="alert">Couldn't load applications. {{ message }}</div>
   }
@@ -109,11 +119,16 @@
         <ng-container matColumnDef="company">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Company</th>
           <td mat-cell *matCellDef="let row">
-            <span class="font-semibold">{{ row.company }}</span>
-            <!-- On phones the role column is hidden, so show it under the company -->
-            @if (!displayedColumns().includes('role')) {
-              <div class="text-xs opacity-70">{{ row.role }}</div>
-            }
+            <span class="flex items-center gap-3">
+              <span class="initials-tile" [attr.data-palette]="tilePalette(row.company)" aria-hidden="true">{{ initials(row.company) }}</span>
+              <span class="min-w-0">
+                <span class="block font-bold text-body">{{ row.company }}</span>
+                <!-- On phones the role column is hidden, so show it under the company -->
+                @if (!displayedColumns().includes('role')) {
+                  <span class="block text-xs text-secondary">{{ row.role }}</span>
+                }
+              </span>
+            </span>
           </td>
         </ng-container>
 
@@ -134,16 +149,33 @@
           <td mat-cell *matCellDef="let row">{{ row.location ?? '—' }}</td>
         </ng-container>
 
-        <!-- Two columns, one per database field, so each can be sorted on its own.
-             The column ids match the backend's sort properties (mat-sort-header uses the id). -->
-        <ng-container matColumnDef="salaryMinLpa">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="numeric-cell">Min salary</th>
-          <td mat-cell *matCellDef="let row" class="numeric-cell">{{ formatLpa(row.salaryMinLpa) }}</td>
-        </ng-container>
-
-        <ng-container matColumnDef="salaryMaxLpa">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="numeric-cell">Max salary</th>
-          <td mat-cell *matCellDef="let row" class="numeric-cell">{{ formatLpa(row.salaryMaxLpa) }}</td>
+        <!-- One column, two sort fields: its header is a small menu offering min or max salary, each way.
+             The choices write the same ?sort=salaryMinLpa|salaryMaxLpa values the two old columns did. -->
+        <ng-container matColumnDef="salary">
+          <th mat-header-cell *matHeaderCellDef [attr.aria-sort]="salarySortAria()">
+            <button
+              type="button"
+              class="salary-sort-button"
+              [class.is-sorted]="salarySort()"
+              [matMenuTriggerFor]="salarySortMenu"
+              [attr.aria-label]="salarySortLabel()"
+            >
+              Salary
+              @if (salarySort(); as sorted) {
+                <span class="normal-case">({{ sorted.field }})</span>
+                <mat-icon aria-hidden="true">{{ sorted.direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+              } @else {
+                <mat-icon aria-hidden="true">unfold_more</mat-icon>
+              }
+            </button>
+            <mat-menu #salarySortMenu="matMenu">
+              <button mat-menu-item (click)="sortBy('salaryMinLpa', 'asc')">Min salary, low to high</button>
+              <button mat-menu-item (click)="sortBy('salaryMinLpa', 'desc')">Min salary, high to low</button>
+              <button mat-menu-item (click)="sortBy('salaryMaxLpa', 'asc')">Max salary, low to high</button>
+              <button mat-menu-item (click)="sortBy('salaryMaxLpa', 'desc')">Max salary, high to low</button>
+            </mat-menu>
+          </th>
+          <td mat-cell *matCellDef="let row" class="whitespace-nowrap">{{ salaryText(row) }}</td>
         </ng-container>
 
         <ng-container matColumnDef="appliedOn">
@@ -153,7 +185,29 @@
           </td>
         </ng-container>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+        <!-- Display only (not a sort field). Due and overdue follow-ups get the same pills as the board. -->
+        <ng-container matColumnDef="followUp">
+          <th mat-header-cell *matHeaderCellDef>Follow-up</th>
+          <td mat-cell *matCellDef="let row" class="whitespace-nowrap">
+            @if (followUp(row); as followUpInfo) {
+              @switch (followUpInfo.state) {
+                @case ('overdue') {
+                  <span class="pill pill-overdue"><mat-icon aria-hidden="true">notifications</mat-icon>Overdue · {{ followUpInfo.date | date: 'd MMM' }}</span>
+                }
+                @case ('today') {
+                  <span class="pill pill-due"><mat-icon aria-hidden="true">notifications</mat-icon>Today</span>
+                }
+                @default {
+                  {{ followUpInfo.date | date: 'd MMM y' }}
+                }
+              }
+            } @else {
+              <span class="text-muted">None</span>
+            }
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns()" class="header-row"></tr>
         <tr
           mat-row
           *matRowDef="let row; columns: displayedColumns()"
@@ -179,13 +233,19 @@
       </table>
     </div>
 
-    <mat-paginator
-      [length]="totalElements()"
-      [pageIndex]="query().page"
-      [pageSize]="query().size"
-      [pageSizeOptions]="pageSizes"
-      (page)="onPage($event)"
-      aria-label="Select page of applications"
-    />
+    <!-- Footer: our own "Showing a–b of n" on the left; Material's paginator (rows per page, previous/next) on
+         the right. Paging stays server-side and in the URL exactly as before. -->
+    <div class="table-footer flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pl-5">
+      <span class="text-[13px] text-secondary" aria-live="polite">{{ showingText() }}</span>
+      <mat-paginator
+        class="list-paginator"
+        [length]="totalElements()"
+        [pageIndex]="query().page"
+        [pageSize]="query().size"
+        [pageSizeOptions]="pageSizes"
+        (page)="onPage($event)"
+        aria-label="Select page of applications"
+      />
+    </div>
   </div>
 </section>

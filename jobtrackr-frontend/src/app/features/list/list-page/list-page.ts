@@ -4,13 +4,14 @@ import { Component, computed, effect, inject, input, signal } from '@angular/cor
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSortModule, Sort, SortDirection } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -27,13 +28,17 @@ import {
 import { Page } from '../../../core/models/page.model';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
 import { ApplicationDialogs } from '../../../shared/components/application-dialogs';
-import { formatLpaAmount } from '../../../shared/utils/format';
+import { companyInitials, companyTilePalette } from '../../../shared/utils/company-tile';
+import { followUpState } from '../../../shared/utils/dates';
+import { formatSalary } from '../../../shared/utils/format';
 
 /** Columns the backend allows in ?sort= (ApplicationService.SORTABLE_FIELDS) that this table offers. */
 const SORTABLE_COLUMNS = ['company', 'role', 'status', 'location', 'salaryMinLpa', 'salaryMaxLpa', 'appliedOn'] as const;
 type SortableColumn = (typeof SORTABLE_COLUMNS)[number];
 const DEFAULT_SORT = { active: 'appliedOn' as SortableColumn, direction: 'desc' as const };
 const PAGE_SIZES = [10, 25, 50];
+/** The status segment that means "no status filter" (the URL then has no ?status=). */
+const ALL_STATUSES = 'ALL';
 /** Salary slider scale in LPA. The top of the scale means "this much or more" (no upper limit). */
 const SALARY_SLIDER_MAX = 100;
 
@@ -51,18 +56,22 @@ type ListState =
     DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
+    MatMenuModule,
     MatPaginatorModule,
     MatProgressBarModule,
-    MatSelectModule,
     MatSliderModule,
     MatSortModule,
     MatTableModule,
   ],
   templateUrl: './list-page.html',
   styleUrl: './list-page.scss',
+  // The footer shows its own "Showing a–b of n" on the left, so the paginator's built-in range text is blank;
+  // its page-size label uses the design's wording
+  providers: [{ provide: MatPaginatorIntl, useFactory: paginatorWithoutRangeLabel }],
 })
 export class ListPage {
   private readonly api = inject(ApplicationApiService);
@@ -83,7 +92,9 @@ export class ListPage {
   protected readonly statuses = APPLICATION_STATUSES;
   protected readonly statusLabels = APPLICATION_STATUS_LABELS;
   protected readonly pageSizes = PAGE_SIZES;
-  protected readonly formatLpa = formatLpaAmount;
+  protected readonly allStatuses = ALL_STATUSES;
+  protected readonly initials = companyInitials;
+  protected readonly tilePalette = companyTilePalette;
   protected readonly searchControl = new FormControl('', { nonNullable: true });
   protected readonly salarySliderMax = SALARY_SLIDER_MAX;
   /** Thumb positions while dragging (the URL only changes when a thumb is released). */
@@ -151,12 +162,41 @@ export class ListPage {
     const to = this.sliderTo();
     const openEnded = to >= SALARY_SLIDER_MAX;
     if (from <= 0 && openEnded) {
-      return 'Any salary';
+      return 'Any';
     }
     if (openEnded) {
       return `₹${from}+ LPA`;
     }
     return from <= 0 ? `Up to ₹${to} LPA` : `₹${from} – ₹${to} LPA`;
+  });
+
+  /** "Showing 11–20 of 42" under the table, from the server's page (not from the URL, which may be out of range). */
+  protected readonly showingText = computed(() => {
+    const page = this.lastPage();
+    const total = page?.totalElements ?? 0;
+    if (!page || total === 0) {
+      return 'Showing 0 of 0';
+    }
+    const first = page.page * page.size + 1;
+    return `Showing ${first}–${first + page.content.length - 1} of ${total}`;
+  });
+
+  /** The merged salary column is "sorted" when the URL sorts by either salary field. */
+  protected readonly salarySort = computed(() => {
+    const { active, direction } = this.query().sort;
+    if (active !== 'salaryMinLpa' && active !== 'salaryMaxLpa') {
+      return null;
+    }
+    return { field: active === 'salaryMinLpa' ? 'min' : 'max', direction };
+  });
+  protected readonly salarySortAria = computed(() => {
+    const sorted = this.salarySort();
+    return sorted ? (sorted.direction === 'asc' ? 'ascending' : 'descending') : null;
+  });
+  protected readonly salarySortLabel = computed(() => {
+    const sorted = this.salarySort();
+    const current = sorted ? `, sorted by ${sorted.field} salary, ${sorted.direction === 'asc' ? 'low to high' : 'high to low'}` : '';
+    return `Sort by salary${current}`;
   });
 
   // Fewer columns on phones; the details drawer shows the rest
@@ -166,7 +206,7 @@ export class ListPage {
   );
   protected readonly displayedColumns = computed(() =>
     this.isWide()
-      ? ['company', 'role', 'status', 'location', 'salaryMinLpa', 'salaryMaxLpa', 'appliedOn']
+      ? ['company', 'role', 'status', 'location', 'salary', 'appliedOn', 'followUp']
       : ['company', 'status', 'appliedOn'],
   );
 
@@ -240,6 +280,11 @@ export class ListPage {
     this.updateUrl({ sort: value, page: null });
   }
 
+  /** The salary header's menu: the same ?sort= values the separate min and max columns used to write. */
+  protected sortBy(field: 'salaryMinLpa' | 'salaryMaxLpa', direction: 'asc' | 'desc'): void {
+    this.updateUrl({ sort: `${field},${direction}`, page: null });
+  }
+
   protected onPage(event: PageEvent): void {
     this.updateUrl({ page: event.pageIndex || null, size: event.pageSize === PAGE_SIZES[0] ? null : event.pageSize });
   }
@@ -264,6 +309,15 @@ export class ListPage {
           this.refresh.update((value) => value + 1);
         }
       });
+  }
+
+  /** "₹13–15 LPA" (or one amount, or a dash); plain text like the other cells. */
+  protected salaryText(row: Application): string {
+    return formatSalary(row) ?? '—';
+  }
+
+  protected followUp(row: Application): { date: string; state: ReturnType<typeof followUpState> } | null {
+    return row.followUpOn ? { date: row.followUpOn, state: followUpState(row.followUpOn) } : null;
   }
 
   /** MatTable's `let row` is untyped; this typed accessor keeps the template strict-mode safe. */
@@ -307,6 +361,13 @@ function salaryBound(raw: string | undefined, isLimit: (value: number) => boolea
   return raw !== undefined && Number.isFinite(value) && value >= 0 && value <= SALARY_SLIDER_MAX && isLimit(value)
     ? Math.round(value)
     : null;
+}
+
+function paginatorWithoutRangeLabel(): MatPaginatorIntl {
+  const intl = new MatPaginatorIntl();
+  intl.getRangeLabel = () => '';
+  intl.itemsPerPageLabel = 'Rows per page';
+  return intl;
 }
 
 function isSortable(value: string | undefined): value is SortableColumn {

@@ -3,7 +3,6 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -14,6 +13,7 @@ import { problemFieldErrors, problemMessage } from '../../../core/api/problem-me
 import { AuthService } from '../../../core/auth/auth-service';
 import { PasswordRules } from '../../../shared/components/password-rules/password-rules';
 import { passwordStrengthValidator } from '../../../shared/validators/password-strength';
+import { AuthLayout } from '../../../shared/components/auth-layout/auth-layout';
 
 @Component({
   selector: 'app-register-page',
@@ -21,7 +21,7 @@ import { passwordStrengthValidator } from '../../../shared/validators/password-s
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
-    MatCardModule,
+    AuthLayout,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,

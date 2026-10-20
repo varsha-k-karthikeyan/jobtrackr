@@ -1,0 +1,112 @@
+@use '@angular/material' as mat;
+
+// Pieces of the signed-out pages' cards (log in, create account, forgot and reset password). The pages project
+// their content into app-auth-layout, and projected content keeps the page's own style scope, so these shared
+// classes are global, scoped under the layout's element.
+
+app-auth-layout {
+  .auth-title {
+    margin: 0;
+    color: var(--color-heading);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .auth-subtitle {
+    margin: 0.375rem 0 0;
+    color: var(--color-label);
+    font-size: 15px;
+  }
+
+  // The main action: full width and 52px high
+  .auth-submit {
+    width: 100%;
+    @include mat.button-overrides((
+      filled-container-height: 52px,
+      filled-label-text-size: 16px,
+    ));
+  }
+
+  // "New here? Create an account" and friends, separated from the form by a divider
+  .auth-footer {
+    margin: 0.25rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-divider);
+    color: var(--color-body);
+    font-size: 15px;
+    text-align: center;
+  }
+
+  // "OR" between the login form and the demo button
+  .or-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--color-label);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid var(--color-divider);
+    }
+  }
+
+  // "Try the demo": a light-blue 52px button with a solid accent circle holding a play icon. A plain button
+  // (not Material), because nothing in Material's button tokens draws the circle; it is still a real button.
+  .demo-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 52px;
+    border: 1px solid var(--color-band-line);
+    border-radius: var(--radius-button);
+    background: var(--color-band);
+    color: var(--color-tomorrow-ink);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--color-band-line);
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus);
+      border-color: var(--color-accent);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+
+    .play-circle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-pill);
+      background: var(--color-accent);
+      color: var(--color-on-accent);
+
+      .mat-icon {
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      }
+    }
+  }
+}

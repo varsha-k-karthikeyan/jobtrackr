@@ -115,6 +115,7 @@
   --shadow-job-card: 0 0 0 1px #e5e7eb, 0 1px 3px rgba(15, 23, 42, 0.08);
   --shadow-menu: 0 16px 40px rgba(15, 23, 42, 0.16);
   --shadow-dialog: 0 24px 60px rgba(15, 23, 42, 0.3);
+  --shadow-auth-card: 0 0 0 1px #e5e7eb, 0 16px 40px rgba(15, 23, 42, 0.1);
   --shadow-primary: 0 4px 12px rgba(29, 78, 216, 0.25);
   --shadow-focus: 0 0 0 4px rgba(29, 78, 216, 0.12);
   --color-backdrop: rgba(15, 23, 42, 0.45);

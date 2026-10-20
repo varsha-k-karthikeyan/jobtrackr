@@ -2,7 +2,6 @@ import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -12,6 +11,7 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { problemMessage } from '../../../core/api/problem-message';
 import { AuthService } from '../../../core/auth/auth-service';
+import { AuthLayout } from '../../../shared/components/auth-layout/auth-layout';
 
 // "Forgot password?": asks for the email address and requests a reset link. The confirmation is worded the
 // same whether or not the address is registered, matching the backend, which never reveals that either.
@@ -21,7 +21,7 @@ import { AuthService } from '../../../core/auth/auth-service';
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
-    MatCardModule,
+    AuthLayout,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,

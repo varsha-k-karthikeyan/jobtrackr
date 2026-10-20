@@ -6,6 +6,7 @@
 @use './styles/theme-colors' as brand;
 @use './styles/header-menus';
 @use './styles/form-dialog';
+@use './styles/auth';
 
 html {
   color-scheme: light;

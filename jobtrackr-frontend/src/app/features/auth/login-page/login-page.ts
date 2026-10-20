@@ -3,8 +3,6 @@ import { Component, DestroyRef, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -16,6 +14,7 @@ import { AuthService } from '../../../core/auth/auth-service';
 import { DEMO_CREDENTIALS } from '../../../core/auth/demo-credentials';
 import { safeReturnUrl } from '../../../core/guards/auth-guards';
 import { LoginRequest } from '../../../core/models/auth.model';
+import { AuthLayout } from '../../../shared/components/auth-layout/auth-layout';
 
 /** Which button started the current request, so only that one shows a spinner. */
 type SignInSource = 'form' | 'demo';
@@ -26,8 +25,7 @@ type SignInSource = 'form' | 'demo';
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
-    MatCardModule,
-    MatDividerModule,
+    AuthLayout,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,

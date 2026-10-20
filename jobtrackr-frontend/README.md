@@ -83,7 +83,39 @@ component ──calls──▶ ApplicationStore ──▶ ApplicationApiService 
 
 **Form fields** are stacked with `gap-4` (16px) on their wrapper element. An outlined field's floating label sits on its top border, a few pixels above the field's box, so with less space a validation error or hint under one field runs into the label of the next. Keep hints short enough for one line.
 
-Tailwind sits in cascade layers and Material does not, so Material always wins on its own components. Use Tailwind for layout around Material widgets (put utilities on a plain wrapper element), and colour custom pieces with Material's `--mat-sys-*` variables or `mat.*-overrides` mixins.
+Tailwind sits in cascade layers and Material does not, so Material always wins on its own components. Use Tailwind for layout around Material widgets (put utilities on a plain wrapper element), and colour custom pieces with the design tokens (`var(--color-*)`, or the matching Tailwind utility) and Material components with `mat.*-overrides` mixins.
+
+## Design system
+
+The approved screens are in [`docs/design/`](../docs/design) (board, list, menus, dialogs, details panel, sign-in pages).
+
+**The rule: components use tokens, never raw values.** Every colour, radius and shadow is defined once, in `src/tailwind.css` under `@theme static`. A component reads it as a CSS variable in SCSS (`var(--color-band)`), as a Tailwind utility on a plain element (`bg-band`, `text-heading`, `rounded-card`, `shadow-menu`), or through a `mat.*-overrides` mixin for a Material component. `static` makes Tailwind emit every token, not only those its utilities use, because SCSS and the Material overrides read them too. The only other raw colours are the generated Material palettes (`src/styles/_theme-colors.scss`).
+
+| Token group | Examples | Used for |
+|---|---|---|
+| Brand | `--color-accent` #1D4ED8, `--color-accent-hover` #1E3A8A | Primary buttons, links, active states, focus rings |
+| Surfaces | `--color-page`, `--color-surface`, `--color-surface-subtle`, `--color-row-hover`, `--color-band`, `--color-band-line` | Page, cards, table header, hover rows, the light-blue bands |
+| Lines | `--color-line`, `--color-divider`, `--color-field-line`, `--color-button-line` | Card rings, dividers, field outlines, secondary buttons |
+| Text | `--color-heading`, `--color-body`, `--color-secondary`, `--color-muted`, `--color-label`, `--color-subtitle` | Titles, body, secondary text, labels and section headings |
+| Feedback | `--color-danger`, `--color-badge`, `--color-success`, `--color-info-ink` | Errors, the bell's count, met password rules, info notes |
+| Pills | `--color-overdue-*`, `--color-due-*`, `--color-tomorrow-*`, `--color-today-interview-*` | Follow-up and interview date pills (always with text) |
+| Initials tiles | `--color-tile-<indigo\|pink\|violet\|green\|sky\|amber>-soft/-ink` | Company tiles; the palette is picked by `shared/utils/company-tile.ts` from the name, so a company looks the same everywhere |
+| Shape and depth | `--radius-field` 12px, `--radius-card` 14px, `--radius-panel` 16px, `--radius-dialog` 20px, `--radius-pill`; `--shadow-card`, `--shadow-job-card`, `--shadow-menu`, `--shadow-dialog`, `--shadow-primary`, `--shadow-focus` | Corners and elevation |
+
+**Status colours** (dot, pill background, pill text). The status is always written out, never shown by colour alone:
+
+| Status | Dot | Pill background | Pill text |
+|---|---|---|---|
+| Applied | `--color-applied` #2563EB | `--color-applied-soft` #DBEAFE | `--color-applied-ink` #1E40AF |
+| Interview | `--color-interview` #D97706 | `--color-interview-soft` #FEF3C7 | `--color-interview-ink` #92400E |
+| Offer | `--color-offer` #16A34A | `--color-offer-soft` #DCFCE7 | `--color-offer-ink` #166534 |
+| Rejected | `--color-rejected` #6B7280 | `--color-rejected-soft` #E5E7EB | `--color-rejected-ink` #374151 |
+
+**Type and icons:** Figtree (400–800) for everything, Material included (`plain-family` and `brand-family` in `mat.theme`); Material Symbols Outlined for icons, whose variable axes give the filled ticks (`FILL 1`) and the heavier details-panel icons (`wght 500`). Both come from Google Fonts, not the bundle.
+
+**Material theme:** palettes generated from #1D4ED8 and #B91C1C, the exact brand roles pinned with `mat.theme-overrides` (a palette's tone 40 is never exactly the brand hex), component shapes through `mat.*-overrides`, and keyboard focus through `mat.strong-focus-indicators` (a 2px accent outline on `:focus-visible` only).
+
+**Where shared pieces live:** `styles.scss` (theme, status pill, date pills, initials tile, field error icon, banners), `styles/_header-menus.scss` (bell and account menu contents, scoped by panel class), `styles/_form-dialog.scss` (dialog chrome, `panelClass: 'app-form-dialog'`), `styles/_auth.scss` (sign-in card pieces under `app-auth-layout`). These are global because the elements they style live in the overlay (menus, dialogs) or are projected content; each is scoped by a class or element so nothing leaks.
 
 ## Authentication
 

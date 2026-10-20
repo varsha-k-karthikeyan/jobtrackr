@@ -1,6 +1,6 @@
 # JobTrackr
 
-Job application tracker: Kanban board, searchable list and in-app follow-up reminders. Monorepo; the git repository is at this root, not inside `jobtrackr-backend`.
+Job application tracker: Kanban board, searchable list, follow-up and interview reminders (the header bell and reminder emails). Monorepo; the git repository is at this root, not inside `jobtrackr-backend`.
 
 The owner is a senior Angular developer learning Spring Boot. After each piece of work, briefly explain the key design decisions, because the code must be explained in interviews. Work one stage at a time, say exactly how to verify it, and wait for "next".
 
@@ -83,7 +83,8 @@ docker compose --profile full up --build
 - **Signals for state** (`signal`, `computed`; `effect` sparingly). RxJS only where it fits: HTTP and debouncing.
 - **New control flow** (`@if`, `@for`, `@switch`, `@let`). Code must work with OnPush (the Angular 22 default) and zoneless.
 - **Functional interceptors and guards** (`core/interceptors`, `core/guards`). **Typed reactive forms.** Lazy routes with `loadComponent`.
-- **UI: Angular Material (+ CDK) and Tailwind CSS only**, no other UI library. Material for interactive widgets; Tailwind for layout. Tailwind sits in cascade layers and loses to Material on Material elements, so put utilities on a plain wrapper, never on a Material component, and colour custom pieces with the `--mat-sys-*` theme variables or `mat.*-overrides` mixins.
+- **UI: Angular Material (+ CDK) and Tailwind CSS only**, no other UI library. Material for interactive widgets; Tailwind for layout. Tailwind sits in cascade layers and loses to Material on Material elements, so put utilities on a plain wrapper, never on a Material component, and style Material components through `mat.*-overrides` mixins.
+- **Design tokens, never raw values.** Every colour, radius and shadow is a token in `src/tailwind.css` (`@theme static`): use `var(--color-*)` / `var(--radius-*)` / `var(--shadow-*)` in SCSS or the matching Tailwind utility (`bg-band`, `rounded-card`). A new colour becomes a new token first. The approved designs are in `docs/design/`; the token tables are in the frontend README ("Design system").
 - **Folders:** `core` (api, auth, interceptors, guards, models, state, notifications (snackbar `Notifier` and the bell's `NotificationStore`), layout), `features/{auth,board,list,stats}`, `shared` (components, validators, utils).
 - **State:** board state lives in `ApplicationStore` (immutable updates via the pure functions in `board-state.ts`; mutations return Promises). Components never call `HttpClient` directly; the list page is the only direct caller of `ApplicationApiService` (`list()`).
 - **Sessions:** 15-minute access token (localStorage, `Authorization` header) + 14-day refresh token in an httpOnly cookie that JavaScript never sees. All `/auth/*` calls use `withCredentials: true`. On a 401 the auth interceptor does one shared refresh and one retry; guards restore the session after a reload. Never put the refresh token anywhere JavaScript can read.

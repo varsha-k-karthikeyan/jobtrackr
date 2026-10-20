@@ -112,6 +112,7 @@
 
   /* Depth */
   --shadow-card: 0 0 0 1px #e5e7eb;
+  --shadow-raised: 0 1px 2px rgba(15, 23, 42, 0.12);
   --shadow-job-card: 0 0 0 1px #e5e7eb, 0 1px 3px rgba(15, 23, 42, 0.08);
   --shadow-menu: 0 16px 40px rgba(15, 23, 42, 0.16);
   --shadow-dialog: 0 24px 60px rgba(15, 23, 42, 0.3);

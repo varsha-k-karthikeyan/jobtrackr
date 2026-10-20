@@ -48,6 +48,15 @@ html {
     surface-container-high: var(--color-surface),
   ));
 
+  // Keyboard focus on Material components (buttons, menu items, toggles, paginator, ...) as a 2px accent
+  // outline instead of Material's faint default state layer. It only appears on :focus-visible, so mouse
+  // users never see it. Custom elements draw their own ring from --shadow-focus or a 2px accent outline.
+  @include mat.strong-focus-indicators((
+    border-color: var(--color-accent),
+    border-width: 2px,
+    border-radius: var(--radius-button),
+  ));
+
   // ---- Component shapes and colours, set once for the whole app ----
   // The *-overrides mixins only set Material's own CSS variables (--mat-form-field-...), so they change the
   // look without fighting the component's CSS, and they survive Material updates.

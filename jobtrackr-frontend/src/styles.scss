@@ -1,26 +1,121 @@
 // Global styles. Angular Material's theme lives here because it needs Sass;
-// Tailwind lives in tailwind.css (plain CSS). Both are listed under "styles" in angular.json.
-@use 'sass:map';
+// Tailwind and the JobTrackr design tokens live in tailwind.css (plain CSS). Both are listed under
+// "styles" in angular.json. Colours, radii and shadows below are var(--token) references: the raw values
+// exist only in tailwind.css (plus the generated palettes in styles/_theme-colors.scss).
 @use '@angular/material' as mat;
+@use './styles/theme-colors' as brand;
 
 html {
   color-scheme: light;
 
-  // Material 3 theme: emits --mat-sys-* CSS variables that every Material component reads.
-  // Use those variables (not hard-coded colours) in custom styles so everything stays on one theme.
+  // Material 3 theme: emits the --mat-sys-* CSS variables that every Material component reads.
+  // The palettes are generated from the brand colours (ng generate @angular/material:theme-color), so the
+  // lighter and darker tones Material derives (containers, hover layers) belong to the same hue.
   @include mat.theme((
     color: (
-      primary: mat.$azure-palette,
-      tertiary: mat.$violet-palette,
+      primary: brand.$primary-palette,
+      tertiary: brand.$tertiary-palette,
+      theme-type: light,
     ),
-    typography: Inter,
+    typography: (
+      plain-family: Figtree,
+      brand-family: Figtree,
+      regular-weight: 400,
+      medium-weight: 600,
+      bold-weight: 700,
+    ),
     density: 0,
   ));
 
-  // Material 3 has no "success" role, so the app defines one from Material's own green palette
-  // (tone 95 = soft container, tone 20 = readable text on it), named like the --mat-sys-* roles.
-  --app-success-container: #{map.get(mat.$green-palette, 95)};
-  --app-on-success-container: #{map.get(mat.$green-palette, 20)};
+  // A palette's tone 40 is close to the brand colour but never exact (#2151DA for #1D4ED8), so the roles the
+  // design names are pinned to the exact tokens. Everything Material draws in "primary", "error" or "surface"
+  // then matches the custom pieces built from the same tokens.
+  @include mat.theme-overrides((
+    primary: var(--color-accent),
+    on-primary: var(--color-on-accent),
+    error: var(--color-danger),
+    outline: var(--color-field-line),
+    outline-variant: var(--color-line),
+    surface: var(--color-surface),
+    on-surface: var(--color-body),
+    on-surface-variant: var(--color-muted),
+    // Menus, select and autocomplete panels, dialogs and the datepicker are white, as in the design
+    surface-container-low: var(--color-surface),
+    surface-container: var(--color-surface),
+    surface-container-high: var(--color-surface),
+  ));
+
+  // ---- Component shapes and colours, set once for the whole app ----
+  // The *-overrides mixins only set Material's own CSS variables (--mat-form-field-...), so they change the
+  // look without fighting the component's CSS, and they survive Material updates.
+  @include mat.form-field-overrides((
+    outlined-container-shape: var(--radius-field),
+    outlined-outline-color: var(--color-field-line),
+    outlined-hover-outline-color: var(--color-label),
+    outlined-focus-outline-color: var(--color-accent),
+    outlined-focus-outline-width: 2px,
+    outlined-error-outline-color: var(--color-danger),
+    outlined-error-hover-outline-color: var(--color-danger),
+    outlined-error-focus-outline-color: var(--color-danger),
+    outlined-label-text-color: var(--color-label),
+    outlined-hover-label-text-color: var(--color-label),
+    outlined-focus-label-text-color: var(--color-accent),
+    outlined-error-label-text-color: var(--color-danger),
+    outlined-error-hover-label-text-color: var(--color-danger),
+    outlined-error-focus-label-text-color: var(--color-danger),
+    error-text-color: var(--color-danger),
+  ));
+
+  @include mat.button-overrides((
+    filled-container-shape: var(--radius-button),
+    filled-container-height: 46px,
+    filled-horizontal-padding: 20px,
+    filled-label-text-weight: 700,
+    outlined-container-shape: var(--radius-button),
+    outlined-container-height: 44px,
+    outlined-outline-color: var(--color-button-line),
+    outlined-label-text-color: var(--color-button-text),
+    outlined-label-text-weight: 600,
+    text-container-shape: var(--radius-button),
+    text-label-text-weight: 600,
+    tonal-container-shape: var(--radius-button),
+    protected-container-shape: var(--radius-button),
+  ));
+
+  @include mat.dialog-overrides((
+    container-shape: var(--radius-dialog),
+    container-color: var(--color-surface),
+    container-elevation-shadow: var(--shadow-dialog),
+  ));
+
+  @include mat.menu-overrides((
+    container-shape: var(--radius-panel),
+    container-color: var(--color-surface),
+    container-elevation-shadow: var(--shadow-menu),
+    item-label-text-color: var(--color-body),
+  ));
+
+  @include mat.select-overrides((
+    panel-background-color: var(--color-surface),
+    container-elevation-shadow: var(--shadow-menu),
+  ));
+
+  @include mat.autocomplete-overrides((
+    container-shape: var(--radius-field),
+    background-color: var(--color-surface),
+    container-elevation-shadow: var(--shadow-menu),
+  ));
+
+  @include mat.datepicker-overrides((
+    calendar-container-shape: var(--radius-panel),
+    calendar-container-background-color: var(--color-surface),
+    calendar-container-elevation-shadow: var(--shadow-menu),
+  ));
+
+  @include mat.badge-overrides((
+    background-color: var(--color-badge),
+    text-color: var(--color-on-accent),
+  ));
 }
 
 html,
@@ -30,13 +125,52 @@ body {
 
 body {
   margin: 0;
-  background: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
+  background: var(--color-page);
+  color: var(--color-body);
   font: var(--mat-sys-body-medium);
 }
 
-// Small app-wide pieces that need theme colours. Kept here (not in Tailwind) so they read the
-// Material system variables and follow the theme automatically.
+// ---- State-dependent Material styling ----
+// The override mixins emit CSS variables, so including one inside a state selector re-themes only that
+// state. No Material class internals are restyled.
+
+// The design's error state is a 2px red outline (Material keeps 1px until the field is focused)
+.mat-mdc-form-field.mat-form-field-invalid {
+  @include mat.form-field-overrides((
+    outlined-outline-width: 2px,
+  ));
+}
+
+// Primary buttons darken on hover instead of showing Material's translucent state layer
+.mat-mdc-unelevated-button:not(:disabled):hover {
+  @include mat.button-overrides((
+    filled-container-color: var(--color-accent-hover),
+    filled-hover-state-layer-opacity: 0,
+  ));
+}
+
+// Two looks Material has no token for: the primary button's coloured shadow and the soft focus ring around
+// a focused outlined field. Both read the tokens, so they still follow the theme.
+.mat-mdc-unelevated-button:not(:disabled) {
+  box-shadow: var(--shadow-primary);
+}
+
+.mat-form-field-appearance-outline.mat-focused:not(.mat-form-field-invalid) .mat-mdc-text-field-wrapper {
+  border-radius: var(--radius-field);
+  box-shadow: var(--shadow-focus);
+}
+
+// The CDK hard-codes rgba(0, 0, 0, 0.32) for every dialog backdrop; the extra class wins over it
+.cdk-overlay-container .cdk-overlay-dark-backdrop {
+  background: var(--color-backdrop);
+}
+
+// Material Symbols is a variable font: weight 400 and the outlined style match the design's line icons
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+// ---- Small app-wide pieces ----
 
 // Microsoft Edge adds its own "reveal password" eye to every password input. Our fields already have a
 // show/hide toggle that works in all browsers, so hide Edge's to avoid two eye icons side by side.
@@ -48,27 +182,27 @@ input::-ms-clear {
 // Inline error message box: forms, failed page loads
 .app-error-banner {
   padding: 0.75rem 1rem;
-  border-radius: var(--mat-sys-corner-medium);
-  background: var(--mat-sys-error-container);
-  color: var(--mat-sys-on-error-container);
+  border-radius: var(--radius-field);
+  background: var(--color-danger-soft);
+  color: var(--color-overdue-ink);
   font: var(--mat-sys-body-medium);
 }
 
 // Inline warning box: e.g. "this card was changed elsewhere"
 .app-warning-banner {
   padding: 0.75rem 1rem;
-  border-radius: var(--mat-sys-corner-medium);
-  background: var(--mat-sys-tertiary-container);
-  color: var(--mat-sys-on-tertiary-container);
+  border-radius: var(--radius-field);
+  background: var(--color-interview-soft);
+  color: var(--color-interview-ink);
   font: var(--mat-sys-body-medium);
 }
 
 // Inline confirmation box: e.g. "your password has been changed"
 .app-success-banner {
   padding: 0.75rem 1rem;
-  border-radius: var(--mat-sys-corner-medium);
-  background: var(--app-success-container);
-  color: var(--app-on-success-container);
+  border-radius: var(--radius-field);
+  background: var(--color-offer-soft);
+  color: var(--color-offer-ink);
   font: var(--mat-sys-body-medium);
 }
 
@@ -79,40 +213,42 @@ input::-ms-clear {
   ));
 }
 
-// Status pill used in the drawer and the list: <span class="status-badge" data-status="OFFER">
+// Status pill used in the drawer and the list: <span class="status-badge" data-status="OFFER">.
+// Always text plus colour, never colour alone.
 .status-badge {
   display: inline-block;
   padding: 0.125rem 0.625rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font: var(--mat-sys-label-medium);
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
+  font-weight: 600;
+  background: var(--color-applied-soft);
+  color: var(--color-applied-ink);
 
   &[data-status='INTERVIEW'] {
-    background: var(--mat-sys-tertiary-container);
-    color: var(--mat-sys-on-tertiary-container);
+    background: var(--color-interview-soft);
+    color: var(--color-interview-ink);
   }
 
-  // Outcomes read at a glance: an offer is green, a rejection red (the theme's error colours)
   &[data-status='OFFER'] {
-    background: var(--app-success-container);
-    color: var(--app-on-success-container);
+    background: var(--color-offer-soft);
+    color: var(--color-offer-ink);
   }
 
   &[data-status='REJECTED'] {
-    background: var(--mat-sys-error-container);
-    color: var(--mat-sys-on-error-container);
+    background: var(--color-rejected-soft);
+    color: var(--color-rejected-ink);
   }
 }
 
-// Text link in the theme's primary colour
+// Text link in the accent colour
 .app-link {
-  color: var(--mat-sys-primary);
-  font-weight: 500;
+  color: var(--color-accent);
+  font-weight: 600;
   text-decoration: none;
 
   &:hover,
   &:focus-visible {
+    color: var(--color-accent-hover);
     text-decoration: underline;
   }
 }

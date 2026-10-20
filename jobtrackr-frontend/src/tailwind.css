@@ -9,7 +9,112 @@
  */
 @import "tailwindcss";
 
-@theme {
-  /* Same font as the Material theme, so Tailwind text and Material text match */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+/*
+ * JobTrackr design tokens: the ONLY place the app's colours, shadows and radii are written as raw values.
+ * Each token is both a CSS variable (var(--color-band) in SCSS, also for Material overrides in styles.scss)
+ * and a Tailwind utility (bg-band, text-heading, shadow-card, rounded-card) for plain wrapper elements.
+ * "static" makes Tailwind emit every variable even when no utility uses it, because SCSS reads them too
+ * (by default Tailwind only emits the variables its generated utilities need).
+ */
+@theme static {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand */
+  --color-accent: #1d4ed8;
+  --color-accent-hover: #1e3a8a;
+
+  /* Surfaces */
+  --color-page: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-row-hover: #f6f7f9;
+  --color-column: #fafbfc;
+  --color-segment: #f1f3f7;
+  --color-band: #eaf0ff;
+  --color-band-line: #d9e3fb;
+
+  /* Lines */
+  --color-line: #e5e7eb;
+  --color-divider: #eef1f5;
+  --color-field-line: #c4cad4;
+  --color-button-line: #d1d5db;
+
+  /* Text */
+  --color-heading: #0f172a;
+  --color-body: #111827;
+  --color-secondary: #374151;
+  --color-muted: #4b5563;
+  --color-label: #475569;
+  --color-button-text: #1f2937;
+  --color-on-accent: #ffffff;
+
+  /* Feedback */
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-badge: #dc2626;
+  --color-success: #16a34a;
+  --color-success-ink: #166534;
+  --color-info-ink: #1e3a8a;
+
+  /* Status: dot / pill background / pill text */
+  --color-applied: #2563eb;
+  --color-applied-soft: #dbeafe;
+  --color-applied-ink: #1e40af;
+  --color-interview: #d97706;
+  --color-interview-soft: #fef3c7;
+  --color-interview-ink: #92400e;
+  --color-offer: #16a34a;
+  --color-offer-soft: #dcfce7;
+  --color-offer-ink: #166534;
+  --color-rejected: #6b7280;
+  --color-rejected-soft: #e5e7eb;
+  --color-rejected-ink: #374151;
+
+  /* Date pills (follow-ups, interviews) */
+  --color-overdue-soft: #fee2e2;
+  --color-overdue-ink: #991b1b;
+  --color-due-soft: #ffedd5;
+  --color-due-ink: #9a3412;
+  --color-tomorrow-soft: #eaf0ff;
+  --color-tomorrow-ink: #1e40af;
+  --color-today-interview-soft: #fef3c7;
+  --color-today-interview-ink: #92400e;
+
+  /* Stats strip */
+  --color-stat-interview: #b45309;
+  --color-stat-offer: #15803d;
+  --color-progress: #7c3aed;
+  --color-progress-track: #e2e8f0;
+
+  /* Initials tiles: pastel background / dark text of the same hue (picked per company, see shared/utils) */
+  --color-tile-indigo-soft: #e0e7ff;
+  --color-tile-indigo-ink: #3730a3;
+  --color-tile-pink-soft: #fce7f3;
+  --color-tile-pink-ink: #9d174d;
+  --color-tile-violet-soft: #ede9fe;
+  --color-tile-violet-ink: #5b21b6;
+  --color-tile-green-soft: #dcfce7;
+  --color-tile-green-ink: #166534;
+  --color-tile-sky-soft: #e0f2fe;
+  --color-tile-sky-ink: #075985;
+  --color-tile-amber-soft: #fef3c7;
+  --color-tile-amber-ink: #92400e;
+
+  /* Shape */
+  --radius-field: 12px;
+  --radius-button: 12px;
+  --radius-tile: 10px;
+  --radius-card: 14px;
+  --radius-panel: 16px;
+  --radius-dialog: 20px;
+  --radius-pill: 999px;
+
+  /* Depth */
+  --shadow-card: 0 0 0 1px #e5e7eb;
+  --shadow-job-card: 0 0 0 1px #e5e7eb, 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-menu: 0 16px 40px rgba(15, 23, 42, 0.16);
+  --shadow-dialog: 0 24px 60px rgba(15, 23, 42, 0.3);
+  --shadow-primary: 0 4px 12px rgba(29, 78, 216, 0.25);
+  --shadow-focus: 0 0 0 4px rgba(29, 78, 216, 0.12);
+  --color-backdrop: rgba(15, 23, 42, 0.45);
 }

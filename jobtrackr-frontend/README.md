@@ -69,8 +69,9 @@ component ──calls──▶ ApplicationStore ──▶ ApplicationApiService 
 
 ## Styling
 
-- `src/styles.scss`: the Angular Material 3 theme (azure/violet, Inter) and a few app-wide classes (`.app-error-banner`, `.status-badge`, ...).
-- `src/tailwind.css`: Tailwind CSS v4, plain CSS on purpose (Tailwind v4 is not meant to run through Sass).
+- `src/tailwind.css`: Tailwind CSS v4 (plain CSS on purpose: Tailwind v4 is not meant to run through Sass) and the **design tokens** in `@theme static`: every colour, radius and shadow of the design (`--color-band`, `--color-applied-soft`, `--radius-field`, `--shadow-menu`, ...). Each token is a CSS variable and a Tailwind utility (`bg-band`, `rounded-card`). Components use these, never raw hex values. The approved screen designs are in `docs/design/`.
+- `src/styles.scss`: the Angular Material 3 theme. Palettes generated from the brand colours (`src/styles/_theme-colors.scss`, by `ng generate @angular/material:theme-color`), the exact brand roles pinned with `mat.theme-overrides`, Figtree as the plain and brand font, and the component shapes (`mat.form-field-overrides`, `button-`, `dialog-`, `menu-`, ...) set once for the app. Plus a few app-wide classes (`.app-error-banner`, `.status-badge`, ...).
+- Fonts come from Google Fonts in `index.html`, not the bundle: Figtree and **Material Symbols Outlined**, which `MatIconRegistry` makes the default for `<mat-icon>` (`app.config.ts`).
 
 **Password fields** use our own show/hide toggle. Microsoft Edge adds a second, built-in eye to every password input; `styles.scss` hides it with `input::-ms-reveal { display: none; }`, so keep that rule.
 

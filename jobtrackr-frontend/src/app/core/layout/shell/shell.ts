@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { openApplicationDrawer } from '../../../shared/components/application-drawer/application-drawer';
+import { companyInitials, companyTilePalette } from '../../../shared/utils/company-tile';
 import { firstName, personInitials } from '../../../shared/utils/person';
 import { AuthService } from '../../auth/auth-service';
 import { DEMO_CREDENTIALS } from '../../auth/demo-credentials';
@@ -66,6 +67,8 @@ export class Shell {
   });
   protected readonly label = followUpLabel;
   protected readonly interviewLabel = interviewLabel;
+  protected readonly tileInitials = companyInitials;
+  protected readonly tilePalette = companyTilePalette;
 
   constructor() {
     // Runs once on sign-in, then after every card change (a new follow-up date, a card moved to Offer)

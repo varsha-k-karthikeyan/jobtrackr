@@ -49,54 +49,74 @@
         >notifications</mat-icon
       >
     </button>
-    <mat-menu #notificationMenu="matMenu" xPosition="before">
-      <!-- stopPropagation: a click on the panel would otherwise close the menu -->
-      <div class="flex min-h-12 items-center pl-4 pr-2" (click)="$event.stopPropagation()">
-        <span class="text-sm font-semibold">Notifications</span>
+    <!-- 400px panel (width in styles.scss: Material creates the panel outside this template) -->
+    <mat-menu #notificationMenu="matMenu" xPosition="before" class="bell-menu">
+      <!-- stopPropagation: a click on the header or a section heading would otherwise close the menu -->
+      <div class="-mt-2 border-b border-divider bg-band px-5 py-4" (click)="$event.stopPropagation()">
+        <span class="text-base font-extrabold text-heading">Notifications</span>
       </div>
-      <mat-divider />
 
       @if (interviews().length === 0 && due().length === 0 && upcoming().length === 0) {
-        <p class="m-0 px-4 py-3 text-sm opacity-70">No interviews or follow-ups in the next 7 days.</p>
+        <p class="m-0 px-5 py-6 text-center text-sm text-muted">No interviews or follow-ups in the next 7 days.</p>
       }
 
       <!-- Interviews first: they happen at a fixed time. No dismiss: one leaves the list once it starts. -->
       @if (interviews().length > 0) {
-        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Interviews</div>
+        <div class="section-heading" (click)="$event.stopPropagation()">
+          <span>Interviews</span>
+          <span class="count-pill count-pill-amber">{{ interviews().length }}</span>
+        </div>
         @for (item of interviews(); track item.applicationId) {
-          <button mat-menu-item (click)="openApplication(item.applicationId)">
-            <span class="block w-60">
-              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
-              <span class="block text-xs" [class.interview-today]="item.daysUntil === 0">{{ interviewLabel(item) }}</span>
-            </span>
-          </button>
+          <div class="bell-row">
+            <button mat-menu-item class="bell-item" (click)="openApplication(item.applicationId)">
+              <span class="bell-item-row">
+                <span class="date-tile" [class.date-tile-today]="item.daysUntil === 0" aria-hidden="true">
+                  <mat-icon>calendar_today</mat-icon>
+                </span>
+                <span class="flex min-w-0 flex-1 flex-col gap-1">
+                  <span class="truncate text-sm"><span class="font-bold text-body">{{ item.company }}</span><span class="text-muted">&nbsp;· {{ item.role }}</span></span>
+                  <span>
+                    <span class="pill" [class.pill-today-interview]="item.daysUntil === 0" [class.pill-tomorrow]="item.daysUntil !== 0">
+                      <mat-icon aria-hidden="true">schedule</mat-icon>{{ interviewLabel(item) }}
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </button>
+          </div>
         }
       }
 
       @if (due().length > 0) {
         @if (interviews().length > 0) {
-          <mat-divider />
+          <mat-divider class="bell-divider" />
         }
-        <div class="flex min-h-10 items-center justify-between gap-2 pl-4 pr-2" (click)="$event.stopPropagation()">
-          <span class="text-xs font-semibold uppercase tracking-wide opacity-70">Follow-ups due</span>
+        <div class="section-heading" (click)="$event.stopPropagation()">
+          <span>Follow-ups due</span>
+          <span class="count-pill count-pill-red">{{ due().length }}</span>
           @if (due().length > 1) {
-            <button mat-button (click)="dismissAll()">Dismiss all</button>
+            <button type="button" class="dismiss-all ml-auto" (click)="dismissAll()">Dismiss all</button>
           }
         </div>
       }
       @for (item of due(); track item.applicationId) {
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center pr-1">
-          <button mat-menu-item (click)="openApplication(item.applicationId)">
-            <!-- Fixed width: Material's text wrapper will not shrink, so truncate needs an explicit width.
-                 w-52 = the 280px menu panel minus the dismiss button and the item padding. -->
-            <span class="block w-52">
-              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
-              <!-- The due label gets its own line, so a long role can never push it out of view -->
-              <span class="block text-xs" [class.follow-up-overdue]="item.daysUntilDue < 0">{{ label(item.daysUntilDue) }}</span>
+        <!-- The row is a menu item (opens the card) plus a separate dismiss button: a button cannot sit inside
+             another, so the wrapper carries the row's hover and focus colour for both -->
+        <div class="bell-row grid grid-cols-[minmax(0,1fr)_auto] items-center pr-1">
+          <button mat-menu-item class="bell-item" (click)="openApplication(item.applicationId)">
+            <span class="bell-item-row">
+              <span class="initials-tile" [attr.data-palette]="tilePalette(item.company)" aria-hidden="true">{{ tileInitials(item.company) }}</span>
+              <span class="flex min-w-0 flex-1 flex-col gap-1">
+                <span class="truncate text-sm"><span class="font-bold text-body">{{ item.company }}</span><span class="text-muted">&nbsp;· {{ item.role }}</span></span>
+                <span>
+                  <span class="pill" [class.pill-overdue]="item.daysUntilDue < 0" [class.pill-due]="item.daysUntilDue >= 0">{{ label(item.daysUntilDue) }}</span>
+                </span>
+              </span>
             </span>
           </button>
           <button
             mat-icon-button
+            class="dismiss-button"
             (click)="$event.stopPropagation(); dismiss(item.applicationId)"
             [attr.aria-label]="'Dismiss follow-up for ' + item.company"
           >
@@ -107,19 +127,27 @@
 
       @if (upcoming().length > 0) {
         @if (interviews().length > 0 || due().length > 0) {
-          <mat-divider />
+          <mat-divider class="bell-divider" />
         }
-        <div class="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide opacity-70">Upcoming follow-ups</div>
+        <div class="section-heading" (click)="$event.stopPropagation()">
+          <span>Upcoming follow-ups</span>
+          <span class="count-pill count-pill-grey">{{ upcoming().length }}</span>
+        </div>
         @for (item of upcoming(); track item.applicationId) {
-          <button mat-menu-item (click)="openApplication(item.applicationId)">
-            <!-- No dismiss button here, so the text can use the full panel width (280px minus padding) -->
-            <span class="block w-60">
-              <span class="block truncate">{{ item.company }} <span class="text-xs opacity-70">· {{ item.role }}</span></span>
-              <span class="block text-xs opacity-70">{{ label(item.daysUntilDue) }}</span>
-            </span>
-          </button>
+          <div class="bell-row">
+            <button mat-menu-item class="bell-item" (click)="openApplication(item.applicationId)">
+              <span class="bell-item-row">
+                <span class="initials-tile" [attr.data-palette]="tilePalette(item.company)" aria-hidden="true">{{ tileInitials(item.company) }}</span>
+                <span class="flex min-w-0 flex-1 flex-col gap-1">
+                  <span class="truncate text-sm"><span class="font-bold text-body">{{ item.company }}</span><span class="text-muted">&nbsp;· {{ item.role }}</span></span>
+                  <span><span class="pill pill-upcoming">{{ label(item.daysUntilDue) }}</span></span>
+                </span>
+              </span>
+            </button>
+          </div>
         }
       }
+      <div class="h-2" aria-hidden="true"></div>
     </mat-menu>
 
     <!-- A plain button (not Material): a pill with the avatar, the first name (hidden on phones) and a chevron -->

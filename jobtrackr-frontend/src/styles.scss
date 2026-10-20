@@ -4,6 +4,7 @@
 // exist only in tailwind.css (plus the generated palettes in styles/_theme-colors.scss).
 @use '@angular/material' as mat;
 @use './styles/theme-colors' as brand;
+@use './styles/header-menus';
 
 html {
   color-scheme: light;
@@ -169,13 +170,6 @@ body {
 // creates the badge element itself, outside the shell template's style encapsulation.
 .header-bell .mat-badge-content {
   box-shadow: 0 0 0 2px var(--color-surface);
-}
-
-// Account menu panel: 360px (Material's menu caps panels at 280px). The panel element is created by MatMenu,
-// outside the shell template, so its size is set here, scoped by the menu's class.
-.account-menu.mat-mdc-menu-panel {
-  width: 360px;
-  max-width: calc(100vw - 2rem);
 }
 
 // List page paginator (elements inside Material's paginator template, so styled globally, scoped by class).

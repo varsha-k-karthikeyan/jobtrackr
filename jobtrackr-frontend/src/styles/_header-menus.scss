@@ -1,0 +1,291 @@
+@use '@angular/material' as mat;
+
+// Contents of the header's two menus (bell and account), written in the shell's template.
+// Global, but every rule is scoped by its panel's class: MatMenu renders the panel in the overlay, outside
+// the shell, and the panel element itself (its width) is not reachable from the shell's encapsulated styles.
+// Kept out of shell.scss so that component stylesheet stays small (Angular's 4 kB per-component budget).
+
+// ---- Bell menu ----
+
+// 400px panel (Material's menu caps panels at 280px)
+.bell-menu.mat-mdc-menu-panel {
+  width: 400px;
+  max-width: calc(100vw - 2rem);
+}
+
+.bell-menu {
+  // Section heading: upper-case label and a count pill (the dismiss-all button sits on the same row)
+  .section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.5rem 1.25rem 0.25rem;
+    color: var(--color-label);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .count-pill {
+    min-width: 1.375rem;
+    padding: 0 0.4375rem;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .count-pill-amber {
+    background: var(--color-interview-soft);
+    color: var(--color-interview-ink);
+  }
+
+  .count-pill-red {
+    background: var(--color-overdue-soft);
+    color: var(--color-overdue-ink);
+  }
+
+  .count-pill-grey {
+    background: var(--color-rejected-soft);
+    color: var(--color-rejected-ink);
+  }
+
+  // "Dismiss all": a small outlined accent button
+  .dismiss-all {
+    min-height: 32px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-band-line);
+    border-radius: var(--radius-tile);
+    background: var(--color-surface);
+    color: var(--color-accent);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--color-band);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 1px;
+    }
+  }
+
+  // A row: no background until hovered or keyboard-focused. The wrapper carries the colour, so a follow-up row is
+  // highlighted as one piece even though it is two controls (the item and its dismiss button). Material's own
+  // item highlight is switched off through its tokens, so the two do not stack.
+  .bell-row {
+    margin: 0 0.5rem;
+    border-radius: var(--radius-tile);
+    @include mat.menu-overrides((
+      item-hover-state-layer-color: transparent,
+      item-focus-state-layer-color: transparent,
+    ));
+
+    // :focus-visible, not :focus-within: Material focuses the first item whenever the menu opens, and a
+    // mouse user should not see that row highlighted; keyboard focus (and the dismiss button's) still is
+    &:hover,
+    &:has(:focus-visible) {
+      background: var(--color-row-hover);
+    }
+  }
+
+  .bell-item {
+    min-height: 60px;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-tile);
+
+    &.cdk-keyboard-focused {
+      outline: 2px solid var(--color-accent);
+      outline-offset: -2px;
+    }
+  }
+
+  .bell-item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  // Interview tile: blue for a later day, amber for today
+  .date-tile {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-tile);
+    background: var(--color-band);
+    color: var(--color-accent);
+
+    // Material gives every icon inside a menu item a 16px right margin; inside the tile it must be centred
+    mat-icon {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      font-size: 20px;
+      color: inherit;
+    }
+  }
+
+  .date-tile-today {
+    background: var(--color-interview-soft);
+    color: var(--color-stat-interview);
+  }
+
+  // Material sizes every icon inside a menu item at 24px with a right margin; inside a pill it is a 14px glyph
+  // in the pill's own colour
+  .bell-item .pill mat-icon {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    font-size: 14px;
+    color: inherit;
+  }
+
+  // Material's text wrapper inside each item does not shrink by default, so long roles would be cut off
+  // without an ellipsis; min-width: 0 lets the truncate class do its job
+  .bell-item .mat-mdc-menu-item-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dismiss-button {
+    @include mat.icon-button-overrides((
+      icon-color: var(--color-secondary),
+    ));
+  }
+
+  .bell-divider {
+    margin: 0.5rem 1.25rem;
+    border-top-color: var(--color-divider);
+  }
+}
+
+// ---- Account menu ----
+
+// 360px panel
+.account-menu.mat-mdc-menu-panel {
+  width: 360px;
+  max-width: calc(100vw - 2rem);
+}
+
+.account-menu {
+  // Each item: 52px, rounded, with a 34px icon tile on the left. The items are written in this template, so
+  // these rules reach them; the class selector plus Angular's scoping attribute outranks Material's defaults.
+  .account-item {
+    // Full width minus the side margins (Material's width: 100% plus margins overflowed the panel sideways)
+    width: calc(100% - 1rem);
+    min-height: 52px;
+    margin: 0 0.5rem;
+    padding: 0 0.625rem;
+    border-radius: var(--radius-tile);
+
+    &:not([disabled]):hover,
+    &.cdk-keyboard-focused,
+    &.cdk-program-focused {
+      background: var(--color-row-hover);
+    }
+
+    &.cdk-keyboard-focused {
+      outline: 2px solid var(--color-accent);
+      outline-offset: -2px;
+    }
+  }
+
+  .account-item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .item-tile {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-tile);
+    background: var(--color-segment);
+    color: var(--color-secondary);
+
+    // Material gives every icon inside a menu item a 16px right margin; inside the tile it must be centred
+    mat-icon {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      font-size: 20px;
+      color: inherit;
+    }
+  }
+
+  .item-tile-accent {
+    background: var(--color-band);
+    color: var(--color-accent);
+  }
+
+  .item-tile-danger {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+  }
+
+  .account-item-danger {
+    color: var(--color-danger);
+  }
+
+  .item-chevron {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    font-size: 20px;
+    color: var(--color-muted);
+  }
+
+  .account-divider {
+    margin: 0.375rem 0;
+    border-top-color: var(--color-divider);
+  }
+
+  // The picture of the switch (decorative: the menu item itself is the checkbox and announces its state)
+  .switch {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 24px;
+    border-radius: var(--radius-pill);
+    background: var(--color-button-line);
+    transition: background-color 150ms ease;
+
+    .switch-knob {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: var(--radius-pill);
+      background: var(--color-surface);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+      transition: transform 150ms ease;
+    }
+
+    &.is-on {
+      background: var(--color-accent);
+
+      .switch-knob {
+        transform: translateX(16px);
+      }
+    }
+  }
+}

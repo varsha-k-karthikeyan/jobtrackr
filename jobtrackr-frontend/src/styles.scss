@@ -5,6 +5,7 @@
 @use '@angular/material' as mat;
 @use './styles/theme-colors' as brand;
 @use './styles/header-menus';
+@use './styles/form-dialog';
 
 html {
   color-scheme: light;
@@ -140,6 +141,31 @@ body {
   @include mat.form-field-overrides((
     outlined-outline-width: 2px,
   ));
+}
+
+// Every field error starts with a small circle-alert icon, as in the design. Added here once, from the icon
+// font's own "error" glyph, instead of an <mat-icon> inside each of the app's <mat-error> elements.
+// .app-field-error does the same for group errors written as plain text (e.g. "min salary > max salary").
+// Scoped under .mat-mdc-form-field: <mat-error> also has Material's .mat-mdc-form-field-bottom-align, whose
+// empty ::before (a baseline strut) has the same specificity and is injected later, so it would win.
+.mat-mdc-form-field .mat-mdc-form-field-error,
+.app-field-error {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  color: var(--color-danger);
+  font-weight: 600;
+
+  &::before {
+    content: 'error';
+    flex: none;
+    font-family: 'Material Symbols Outlined';
+    font-size: 15px;
+    font-weight: 400;
+    line-height: inherit;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
 // Primary buttons darken on hover instead of showing Material's translucent state layer

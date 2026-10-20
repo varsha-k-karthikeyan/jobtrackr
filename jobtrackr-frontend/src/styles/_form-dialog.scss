@@ -1,0 +1,79 @@
+@use '@angular/material' as mat;
+
+// Shared chrome of the form dialogs (add/edit application, change password), opened with
+// panelClass: 'app-form-dialog'. Global because the dialog panel lives in the overlay; every rule is scoped by
+// that class. Spacing and title type go through Material's dialog tokens; the header tile, the divider under
+// the header and the grey footer are plain elements and classes.
+//
+//   <div class="form-dialog-header">
+//     <span class="form-dialog-tile"><mat-icon>work</mat-icon></span>
+//     <h2 mat-dialog-title>Add application</h2>
+//     <button mat-icon-button mat-dialog-close aria-label="Close">…</button>
+//   </div>
+//   <mat-dialog-content>…</mat-dialog-content>
+//   <mat-dialog-actions align="end">…</mat-dialog-actions>
+
+.app-form-dialog {
+  @include mat.dialog-overrides((
+    headline-padding: 0,
+    content-padding: 24px 28px 8px,
+    with-actions-content-padding: 24px 28px 8px,
+    actions-padding: 16px 28px,
+    subhead-color: var(--color-heading),
+    subhead-size: 24px,
+    subhead-weight: 800,
+    subhead-line-height: 32px,
+    subhead-tracking: -0.01em,
+  ));
+
+  .form-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 1.25rem 1.25rem 1.25rem 1.75rem;
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  // Material puts an invisible 40px "baseline" box before the title text; the header row aligns it instead
+  .mat-mdc-dialog-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+
+    &::before {
+      display: none;
+    }
+  }
+
+  .form-dialog-tile {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-field);
+    background: var(--color-band);
+    color: var(--color-accent);
+
+    .mat-icon {
+      width: 22px;
+      height: 22px;
+      font-size: 22px;
+    }
+  }
+
+  .mat-mdc-dialog-actions {
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-divider);
+    background: var(--color-surface-subtle);
+  }
+
+  // Footer buttons at the design's height: Cancel is the outlined secondary button, the primary is filled
+  .mat-mdc-dialog-actions .mat-mdc-button-base {
+    @include mat.button-overrides((
+      outlined-container-height: 46px,
+      filled-container-height: 46px,
+    ));
+  }
+}

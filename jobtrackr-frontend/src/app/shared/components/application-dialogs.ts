@@ -48,8 +48,11 @@ export class ApplicationDialogs {
   private openForm(data: ApplicationDialogData): MatDialogRef<ApplicationDialog, Application> {
     return this.dialog.open<ApplicationDialog, ApplicationDialogData, Application>(ApplicationDialog, {
       data,
-      width: 'min(44rem, calc(100vw - 2rem))',
+      // 880px on desktop; the full screen width on phones, where the form is one column
+      width: 'min(55rem, 100vw)',
       maxWidth: '100vw',
+      // Header tile, divider and grey footer shared with the change-password dialog (styles/_form-dialog.scss)
+      panelClass: 'app-form-dialog',
       maxHeight: 'calc(100dvh - 2rem)',
       // A half-filled form is easy to lose with one stray click outside, so only Cancel/Esc close it
       disableClose: true,

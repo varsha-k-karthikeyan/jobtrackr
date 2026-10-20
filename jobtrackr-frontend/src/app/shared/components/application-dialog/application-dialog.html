@@ -1,5 +1,9 @@
-<!-- Header: title plus a close icon that behaves exactly like Cancel (closes without saving) -->
-<div class="flex items-center justify-between gap-2 pr-3">
+<!-- Header: icon tile, title, and a close icon that behaves exactly like Cancel (closes without saving).
+     Chrome shared with the change-password dialog: styles/_form-dialog.scss -->
+<div class="form-dialog-header">
+  <span class="form-dialog-tile" aria-hidden="true">
+    <mat-icon>{{ isEdit ? 'edit' : 'work' }}</mat-icon>
+  </span>
   <h2 mat-dialog-title>{{ isEdit ? 'Edit application' : 'Add application' }}</h2>
   <button mat-icon-button type="button" mat-dialog-close [disabled]="saving()" aria-label="Close without saving">
     <mat-icon>close</mat-icon>
@@ -82,7 +86,9 @@
         <mat-form-field appearance="outline">
           <mat-label>Min salary</mat-label>
           <input matInput type="number" min="0" step="0.5" formControlName="salaryMinLpa" />
-          <span matTextSuffix>LPA</span>
+          <!-- matSuffix (its own slot), not matTextSuffix: an inline text suffix sat right after the input,
+               so the resting label ran into it ("Min salaryLPA") -->
+          <span matSuffix class="lpa-suffix">LPA</span>
           @if (form.controls.salaryMinLpa.hasError('min')) {
             <mat-error>Can't be negative</mat-error>
           } @else if (form.controls.salaryMinLpa.hasError('max')) {
@@ -94,7 +100,7 @@
         <mat-form-field appearance="outline">
           <mat-label>Max salary</mat-label>
           <input matInput type="number" min="0" step="0.5" formControlName="salaryMaxLpa" />
-          <span matTextSuffix>LPA</span>
+          <span matSuffix class="lpa-suffix">LPA</span>
           @if (form.controls.salaryMaxLpa.hasError('min')) {
             <mat-error>Can't be negative</mat-error>
           } @else if (form.controls.salaryMaxLpa.hasError('max')) {
@@ -160,7 +166,7 @@
       </div>
 
       @if (form.hasError('interviewIncomplete') && (form.controls.interviewDate.touched || form.controls.interviewTime.touched)) {
-        <p class="form-group-error m-0 -mt-2 text-xs sm:col-span-2" role="alert">Pick both a date and a time for the interview, or clear both</p>
+        <p class="app-field-error form-group-error m-0 -mt-2 text-xs sm:col-span-2" role="alert">Pick both a date and a time for the interview, or clear both</p>
       }
 
       <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -178,17 +184,19 @@
     </div>
 
     @if (form.hasError('salaryRange') && (form.controls.salaryMinLpa.touched || form.controls.salaryMaxLpa.touched)) {
-      <p class="salary-range-error m-0 -mt-2 mb-2 text-xs" role="alert">Min salary can't be more than max salary</p>
+      <p class="app-field-error salary-range-error m-0 -mt-2 mb-2 text-xs" role="alert">Min salary can't be more than max salary</p>
     }
   </form>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancel</button>
+  <button mat-stroked-button type="button" mat-dialog-close [disabled]="saving()">Cancel</button>
   <button mat-flat-button type="submit" form="application-form" [disabled]="saving()">
     <span class="inline-flex items-center gap-2">
       @if (saving()) {
         <mat-progress-spinner mode="indeterminate" diameter="18" aria-label="Saving" />
+      } @else {
+        <mat-icon class="button-icon" aria-hidden="true">{{ isEdit ? 'check' : 'add' }}</mat-icon>
       }
       {{ isEdit ? 'Save changes' : 'Add application' }}
     </span>

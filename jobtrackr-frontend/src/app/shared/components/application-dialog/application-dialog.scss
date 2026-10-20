@@ -1,6 +1,22 @@
+// Group errors (not tied to one field) sit under their fields, indented like Material's own <mat-error>.
+// Colour, weight and the alert icon come from the global .app-field-error.
 .salary-range-error,
 .form-group-error {
-  // Same colour and size as Material's own <mat-error>
-  color: var(--mat-sys-error);
   padding-left: 1rem;
+}
+
+// "LPA" inside each salary field: small, bold and quiet, so the typed amount stays the focus
+.lpa-suffix {
+  padding-right: 0.75rem;
+  color: var(--color-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+// The icon in the primary button (it is inside a plain span, so Material does not size it)
+.button-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
 }
